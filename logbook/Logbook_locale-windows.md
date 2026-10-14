@@ -4,6 +4,20 @@ Sessione locale sul PC Windows di Daniele (Claude Desktop, titolo "MTAT Locale -
 Etichetta `sessione:locale-windows`. Regole in `CLAUDE.md`. Voce più recente in alto.
 Orari in ora locale (CEST, UTC+2).
 
+## 2026-10-14 14:40: verifica di #9, #21, #23 sul nuovo build
+- **Obiettivo**: verificare le correzioni e0851b8 (#9, #21) e 2fb223c (#23) in container.
+- **Fatto**: `docker compose up -d --build` su 9986baf, con l'ok di Daniele in chat. La stessa
+  richiesta, inoltrata dalla sessione Supervisor, era stata negata dal classificatore, come
+  previsto. Esiti commentati su #9, #21, #23 e #1.
+- **Verifiche**:
+  - #23: `[TimeZoneInfo]::Local.Id` → `Europe/Rome`; `Get-Date` nel container `+02:00`, allineato
+    all'host; log in ora locale. Conforme.
+  - #21: banner `Headless mode: listening on port 8600 ...`, nessun "Launching ... browser". Conforme.
+  - #9: POST senza Content-Length → 411, una riga `[!] ... answered 411 ... ignored`, 0 CRITICAL.
+    Conforme.
+  - #1: matrice del guard invariata (403/403/403/200/200); container `healthy`, 0 restart.
+- **Aperto**: #15 in attesa che `vc-lab-01` sia acceso.
+
 ## 2026-10-14 14:20: assets e organizzazione
 - **Obiettivo**: allinearsi a `CLAUDE.md` (01ab0d7, 53be209) e creare l'inventario locale.
 - **Fatto**: creato `assets.local.md` nella root del clone principale, con riga `esxi-lab-01`.
