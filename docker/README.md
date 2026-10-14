@@ -31,6 +31,7 @@ variabili d'ambiente, già impostate nell'immagine:
 | `MTAT_HEADLESS` | `1` | non impostata | niente apertura browser, niente auto-spegnimento per assenza di heartbeat UI, log su stdout |
 | `MTAT_PORT` | `8600` | auto (8600+) | porta fissa |
 | `MTAT_BIND_HOST` | `+` (tutte le interfacce) | `127.0.0.1` | interfaccia di ascolto dentro il container |
+| `MTAT_ALLOWED_HOSTS` | vuota | vuota | hostname aggiuntivi accettati nell'header `Host` (oltre a localhost/127.0.0.1/[::1]) |
 | `MTAT_DATA_DIR` | `/var/lib/mtat` (volume) | temp di sistema | dove viene scritto `MTAT_debug_log.txt` |
 
 ## Sicurezza
@@ -40,10 +41,17 @@ Per questo il compose pubblica la porta solo su `127.0.0.1` dell'host. Per l'acc
 macchine:
 
 ```bash
-MTAT_PUBLISH_ADDR=0.0.0.0 docker compose up -d
+MTAT_PUBLISH_ADDR=0.0.0.0 MTAT_ALLOWED_HOSTS=mtat.lab.local docker compose up -d
 ```
 
-solo su rete fidata o dietro un reverse proxy con autenticazione. Come nella versione desktop, i
+solo su rete fidata o dietro un reverse proxy con autenticazione.
+
+Protezioni nel motore (sempre attive, anche in modalità desktop):
+- **Host allowlist**: richieste con header `Host` diverso da localhost/127.0.0.1/[::1] o da
+  `MTAT_ALLOWED_HOSTS` → 403. Blocca il DNS rebinding, che l'ascolto su tutte le interfacce
+  (`MTAT_BIND_HOST=+`) altrimenti renderebbe possibile.
+- **Anti-CSRF**: POST con header `Origin` di un altro sito → 403. La UI di MTAT (same-origin) e i
+  client non-browser (senza `Origin`) passano. Come nella versione desktop, i
 certificati self-signed di vCenter vengono accettati (`-InvalidCertificateAction Ignore`).
 
 ## Rete

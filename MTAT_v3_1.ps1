@@ -19,8 +19,14 @@ try {
 #   MTAT_DATA_DIR     where the debug log / loading page are written (default: system temp dir)
 # The engine has NO authentication of its own: anyone who can reach the port can drive the
 # vCenter sessions it holds. Only expose it beyond localhost behind a trusted network/proxy.
+#   MTAT_ALLOWED_HOSTS  extra comma-separated hostnames the UI may be reached by (e.g. the
+#                     server's DNS name when published beyond localhost); localhost/127.0.0.1/[::1]
+#                     are always allowed. Any other Host header is rejected -- see the request guard.
 $global:Headless = ($env:MTAT_HEADLESS -in @('1', 'true', 'yes'))
 $bindHost = if ($env:MTAT_BIND_HOST) { $env:MTAT_BIND_HOST } else { "127.0.0.1" }
+$global:AllowedHosts = @('localhost', '127.0.0.1', '[::1]') + @(
+    "$env:MTAT_ALLOWED_HOSTS".Split(',') | ForEach-Object { $_.Trim().ToLower() } | Where-Object { $_ }
+)
 
 function Write-Terminal($Message, $Color="White") {
     if ($global:Headless) {
@@ -3206,6 +3212,35 @@ while ($listener.IsListening) {
         $req = $context.Request
         $res = $context.Response
         $rawPath = $req.Url.LocalPath.ToLower().Trim('/')
+
+        # Request guard. A 127.0.0.1 listener prefix only accepts requests whose Host header is
+        # 127.0.0.1, but a wildcard prefix (MTAT_BIND_HOST=+, used in containers) accepts any Host --
+        # which re-opens DNS rebinding: a malicious page whose domain re-resolves to 127.0.0.1 would
+        # become same-origin with this engine and could drive the vCenter sessions it holds. So the
+        # Host header is checked explicitly against an allowlist. Separately, any browser page could
+        # fire a cross-site POST at the API (CSRF), so state-changing POSTs must come either from the
+        # engine's own UI (Origin matching an allowed host) or from a non-browser client (no Origin).
+        $hostHeaderName = try { ([Uri]"http://$($req.Headers['Host'])/").Host.ToLower() } catch { "" }
+        $originHeader = $req.Headers['Origin']
+        $originHostName = $null
+        if ($originHeader) {
+            $originHostName = try { ([Uri]$originHeader).Host.ToLower() } catch { "" }
+        }
+        $guardReason = $null
+        if ($hostHeaderName -notin $global:AllowedHosts) {
+            $guardReason = "Host header '$($req.Headers['Host'])' is not allowed (set MTAT_ALLOWED_HOSTS to add it)"
+        }
+        elseif ($req.HttpMethod -ne "GET" -and $originHeader -and $originHostName -notin $global:AllowedHosts) {
+            $guardReason = "cross-origin $($req.HttpMethod) from Origin '$originHeader' rejected"
+        }
+        if ($guardReason) {
+            Write-DebugLog "[!] Request to /$rawPath blocked: $guardReason."
+            $res.StatusCode = 403
+            $res.ContentType = "text/plain"
+            $res.ContentLength64 = 0
+            $res.Close()
+            continue
+        }
         
         if ($req.HttpMethod -eq "GET" -and ($rawPath -eq "" -or $rawPath -eq "index.html")) {
             $uiConnected = $true

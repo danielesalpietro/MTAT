@@ -15,11 +15,14 @@ services:
       MTAT_HEADLESS: "1"
       MTAT_PORT: "8600"
       MTAT_BIND_HOST: "+"
+      # Hostnames the UI may be opened by besides localhost/127.0.0.1 (comma-separated), e.g.
+      # "mtat.lab.local" when published beyond loopback. Other Host headers get 403 (anti DNS-rebinding).
+      MTAT_ALLOWED_HOSTS: ${MTAT_ALLOWED_HOSTS:-}
       TZ: ${TZ:-Europe/Rome}
     ports:
       # Published on the host's loopback only: MTAT has no login of its own and anyone who
-      # reaches it can use the vCenter sessions it holds. Set MTAT_PUBLISH_ADDR=0.0.0.0 only
-      # on a trusted network or behind an authenticating reverse proxy.
+      # reaches it can use the vCenter sessions it holds. Set MTAT_PUBLISH_ADDR=0.0.0.0 (plus
+      # MTAT_ALLOWED_HOSTS) only on a trusted network or behind an authenticating reverse proxy.
       - "${MTAT_PUBLISH_ADDR:-127.0.0.1}:${MTAT_HOST_PORT:-8600}:8600"
     volumes:
       - mtat-data:/var/lib/mtat
