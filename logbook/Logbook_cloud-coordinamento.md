@@ -3,6 +3,19 @@
 Sessione cloud (claude.ai/code) di coordinamento. Etichetta `sessione:cloud-coordinamento`.
 Regole in `CLAUDE.md`. Voce più recente in alto.
 
+## 2026-10-14 13:05: #15 primo contatto con vc-lab-01; fix #25 (nessun cluster)
+- **Obiettivo**: gestire l'esito della prima connessione reale (riportato da `locale-windows`).
+- **Fatto**: login su `vc-lab-01` riuscito ma il lab non ha cluster → aperta #25 e corretta:
+  avviso in UI e schede bloccate se la lista cluster è vuota; log del numero di cluster per vCenter.
+  La funzionalità "host standalone / lista di host" è #24 (bozza di Daniele, aperta da `locale-windows`).
+- **Verifiche**: container con PowerCLI stub (0 e 2 cluster): `api/connect` → `[]` / 2 voci, riga di
+  log corretta; UI in Chromium headless (Playwright): con 0 cluster avviso e schede bloccate, con 2
+  cluster menu popolato e schede sbloccate, 0 errori JS. Build in cloud da Dockerfile senza il passo
+  `apt` (tzdata), non installabile da questa rete; la build reale resta alla CI.
+- **Aperto**: `vc-lab-01` risulta API 8.0.0.1 (probabilmente 8.0 GA): il Memory Tiering richiede
+  8.0 U3, da confermare in #22. Login fatto con administrator@ per scelta di Daniele (annotato in
+  #15); serve l'account in sola lettura.
+
 ## 2026-10-14 12:45: verifica locale di #9, #21, #23 e build per #15
 - **Obiettivo**: confermare sul PC Windows le correzioni fatte in cloud.
 - **Fatto**: sessione rinominata "MTAT Supervisor"; titoli delle sessioni in `CLAUDE.md` (9986baf);

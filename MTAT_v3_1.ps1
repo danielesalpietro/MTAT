@@ -1550,7 +1550,14 @@ $htmlContent = @'
 
                         var cSelect = document.getElementById('clusterSelect'); cSelect.innerHTML = "";
                         var simSelect = document.getElementById('simClusterSelect'); simSelect.innerHTML = "";
-                        var cList = data.clusters; if (typeof cList === 'string') cList = [cList];
+                        var cList = data.clusters || []; if (!Array.isArray(cList)) cList = [cList];
+                        // Login can succeed against a vCenter that has no cluster objects at all (e.g. a
+                        // lab with only standalone hosts) -- say so explicitly instead of unlocking the
+                        // analysis tabs with an empty, unexplained Target Cluster menu.
+                        if (cList.length === 0) {
+                            showToast("Connected, but no vSphere clusters were found on the connected vCenter(s).\n\nMTAT analyzes clusters only: standalone ESXi hosts that are not members of a cluster are not listed. Add the hosts to a cluster and connect again.", 'warn');
+                            return;
+                        }
                         for (var i = 0; i < cList.length; i++) {
                             var optHtml = "<option value='" + escapeHtml(cList[i].Value) + "'>" + escapeHtml(cList[i].Text) + "</option>";
                             cSelect.innerHTML += optHtml;
@@ -3359,6 +3366,7 @@ while ($listener.IsListening) {
                 $clusterList = New-Object System.Collections.Generic.List[PSObject]
                 foreach ($server in $global:DefaultVIServers) {
                     $serverClusters = Get-Cluster -Server $server -ErrorAction SilentlyContinue
+                    Write-DebugLog "[connect] '$($server.Name)': $(($serverClusters | Measure-Object).Count) cluster(s) found."
                     foreach ($c in $serverClusters) {
                         $clusterList.Add([PSCustomObject]@{
                             Value = "$($server.Name)|$($c.Name)"
