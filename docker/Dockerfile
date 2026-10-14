@@ -20,8 +20,12 @@ ENV TERM=dumb \
 # Optional corporate root CAs (e.g. a TLS-inspecting proxy in front of PSGallery or vCenter):
 # drop *.crt files into docker/certs/ before building. An empty folder is a no-op.
 COPY docker/certs/ /usr/local/share/ca-certificates/mtat/
-# (ca-certificates already ships in the base image.)
-RUN update-ca-certificates
+# ca-certificates already ships in the base image; tzdata does not, and without it the TZ
+# variable (docker-compose.yml) is silently ignored and every log timestamp is UTC.
+RUN update-ca-certificates \
+ && apt-get update \
+ && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tzdata \
+ && rm -rf /var/lib/apt/lists/*
 
 RUN if [ "$SKIP_POWERCLI" != "1" ]; then \
       pwsh -NoLogo -NoProfile -Command " \

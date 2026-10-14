@@ -31,6 +31,8 @@ jobs:
           curl -sf -o /dev/null --retry 30 --retry-all-errors --retry-delay 2 http://127.0.0.1:8600/api/ping
           curl -sf http://127.0.0.1:8600/ | grep -q "Memory Tiering Assessment Tool"
           curl -sf http://127.0.0.1:8600/api/get-version-info | tee /dev/stderr | grep -vq '"CurrentPowerCli":"Unknown"'
+          # TZ from docker-compose.yml (default Europe/Rome) must be honoured -- needs tzdata in the image.
+          test "$(docker compose exec -T mtat pwsh -NoProfile -Command '[TimeZoneInfo]::Local.Id')" = "Europe/Rome"
           # Headless mode must not self-terminate when no browser connects (desktop mode does after 60s).
           sleep 75
           curl -sf -o /dev/null http://127.0.0.1:8600/api/ping

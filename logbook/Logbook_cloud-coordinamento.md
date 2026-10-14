@@ -3,6 +3,14 @@
 Sessione cloud (claude.ai/code) di coordinamento. Etichetta `sessione:cloud-coordinamento`.
 Regole in `CLAUDE.md`. Voce più recente in alto.
 
+## 2026-10-14 12:35: fuso orario nel container (#23)
+- **Obiettivo**: log del container nell'ora locale (segnalazione `locale-windows`).
+- **Fatto**: `tzdata` installato nel Dockerfile; controllo `TimeZoneInfo` nello smoke test CI.
+- **Verifiche**: causa confermata (immagine base senza `/usr/share/zoneinfo` → UTC). In cloud il
+  passo `apt-get` **non è eseguibile** (il proxy della sessione accetta solo HTTPS): verificato con
+  un'immagine di test con zoneinfo copiata → log in ora di Roma. Build reale con apt: affidata alla CI.
+- **Aperto**: esito CI; riverifica sul PC locale al prossimo build.
+
 ## 2026-10-14 12:30: ESXi Admin come sessione esterna
 - **Fatto**: `CLAUDE.md`: ESXi Admin gira su un altro progetto, niente remote-control: le richieste
   al laboratorio vanno in issue `sessione:esxi-admin` e le inoltra Daniele.
