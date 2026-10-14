@@ -231,6 +231,28 @@ function Get-VmTieringNotes ($HostVersion, $NumCpu) {
     return ($notes -join "; ")
 }
 
+# Active-memory thresholds of the Memory Tiering capacity planning guidance (#38, rules M-WL-01..03
+# in docs/mtat-regole-memory-tiering.md). The NVMe:DRAM ratio is the one the host really runs with
+# when tiering is on; otherwise the planned default 1:1 (100%), so the same checks work as a
+# pre-assessment on hosts that are not tiered yet.
+function Get-WorkloadTierRatioPct ($Tiering, $TierRatioPct) {
+    if ($Tiering -eq "Enabled" -and [int]$TierRatioPct -gt 0) { return [int]$TierRatioPct }
+    return 100
+}
+
+# DRAM share of a tiered VM: its memory is split between DRAM and NVMe in the host ratio, so with
+# ratio r (NVMe as % of DRAM) the DRAM part is memory * 100 / (100 + r) -- half the VM at 1:1.
+function Get-VmDramShareGB ($MemoryGB, $RatioPct) {
+    return [math]::Round([double]$MemoryGB * 100 / (100 + [int]$RatioPct), 2)
+}
+
+# M-WL-01: host active memory must stay within 50% of DRAM at all times, hence the peak is checked.
+function Get-HostActiveCheck ($ActiveGB, $DramGB) {
+    if ([double]$DramGB -le 0) { return "UNKNOWN" }
+    if ([double]$ActiveGB -le [double]$DramGB * 0.5) { return "PASS" }
+    return "WARN"
+}
+
 function Add-KnownIssueHints ($ExceptionText) {
     if ($ExceptionText -match "Permission to perform this operation was denied" -and $ExceptionText -match "System\.View") {
         return "$ExceptionText [Likely cause: the account authenticated but has no role on the vCenter inventory. Assign it at least the Read-only role on the vCenter root object (Hosts and Clusters, top level) with 'Propagate to children' enabled, then connect again.]"
@@ -891,6 +913,7 @@ $htmlContent = @'
                     <div class="metric-row" style="justify-content:flex-start;"><span class="metric-name" title="Highest sampled Active Memory % using vCenter's average-rollup samples (a true maximum-rollup query often isn't retained). Capacity math uses this worst-case value so sizing doesn't under-provision for bursty workloads.">Active Memory (Peak)</span><span class="metric-target">[ Target: &lt;= 50% ]</span><div class="metric-value"><span id="lblBaseActive">0%</span><div class="pct-bar-track"><div class="pct-bar-fill" id="barBaseActive"></div></div></div><span class="badge" id="badgeBaseActive"></span></div>
                     <div class="metric-row" style="justify-content:flex-start;"><span class="metric-name" title="Average Active Memory % across the range -- shown for reference only. The Peak figure above (not this average) drives the pass/fail badge and all capacity/sizing math.">Active Memory (Avg)</span><span class="metric-target" style="font-style:italic;">[ For reference only ]</span><div class="metric-value"><span id="lblBaseActiveAvg">0%</span><div class="pct-bar-track"><div class="pct-bar-fill" id="barBaseActiveAvg"></div></div></div></div>
                     <div id="rowActiveVariabilityWarn" style="display:none; margin: -6px 0 12px 0; font-size:12px; font-weight:bold; color:var(--text-warning-soft);" role="status" aria-live="polite"></div>
+                    <div id="rowActiveRiskWarn" style="display:none; margin: -6px 0 12px 0; font-size:12px; font-weight:bold; color:var(--text-warning-soft);" role="status" aria-live="polite"></div>
                     <div class="metric-row" style="justify-content:flex-start;"><span class="metric-name" title="Average Consumed Memory %. Tiering only activates once real memory pressure exists, so this must be at or above 80% before a cluster is a good candidate.">Consumed Memory (Avg)</span><span class="metric-target">[ Target: &gt;= 80% ]</span><div class="metric-value"><span id="lblBaseConsumed">0%</span><div class="pct-bar-track"><div class="pct-bar-fill" id="barBaseConsumed"></div></div></div><span class="badge" id="badgeBaseConsumed"></span><span class="note-text note-blue" id="lblBaseConsumedNote"></span></div>
                 </div>
             </div>
@@ -924,6 +947,9 @@ $htmlContent = @'
                         <th class="sortable" data-type="num" onclick="sortTableByHeader(this)">Consumed_GB<span class="sort-arrow"></span></th>
                         <th class="sortable" data-type="num" onclick="sortTableByHeader(this)">Active_GB<span class="sort-arrow"></span></th>
                         <th class="sortable" data-type="num" onclick="sortTableByHeader(this)">Active_Pct<span class="sort-arrow"></span></th>
+                        <th class="sortable" data-type="text" onclick="sortTableByHeader(this)" title="M-WL-01: peak Active Memory must stay within 50% of this host's DRAM">Active_Check<span class="sort-arrow"></span></th>
+                        <th class="sortable" data-type="num" onclick="sortTableByHeader(this)" title="M-WL-03: average Active Memory of the tiered VMs plus the full memory of DRAM-only VMs (kernel memory not subtracted yet)">VM_Demand_GB<span class="sort-arrow"></span></th>
+                        <th class="sortable" data-type="text" onclick="sortTableByHeader(this)" title="M-WL-03: VM demand must fit in this host's DRAM">VM_Demand_Check<span class="sort-arrow"></span></th>
                     </tr></thead><tbody></tbody></table>
                 </div>
             </div>
@@ -949,6 +975,9 @@ $htmlContent = @'
                         <th class="sortable" data-type="num" onclick="sortTableByHeader(this)">Pages_2MB<span class="sort-arrow"></span></th>
                         <th class="sortable" data-type="num" onclick="sortTableByHeader(this)">vCPU<span class="sort-arrow"></span></th>
                         <th class="sortable" data-type="text" onclick="sortTableByHeader(this)" title="Version-specific Memory Tiering caveats for this VM (e.g. ESX 9.0 known issue for VMs with more than 60 vCPUs)">Tiering_Notes<span class="sort-arrow"></span></th>
+                        <th class="sortable" data-type="num" onclick="sortTableByHeader(this)" title="Average Active Memory over the range (equal to Active_GB in Real-Time)">Active_Avg_GB<span class="sort-arrow"></span></th>
+                        <th class="sortable" data-type="num" onclick="sortTableByHeader(this)" title="DRAM available to this VM: memory * 100 / (100 + NVMe ratio %), with the host's real ratio when tiering is on, otherwise the planned 1:1. DRAM-only VMs keep all their memory in DRAM.">DRAM_Share_GB<span class="sort-arrow"></span></th>
+                        <th class="sortable" data-type="text" onclick="sortTableByHeader(this)" title="M-WL-02: the VM's average Active Memory must fit in its DRAM share">DRAM_Fit<span class="sort-arrow"></span></th>
                     </tr></thead><tbody></tbody></table>
                 </div>
             </div>
@@ -1242,6 +1271,11 @@ $htmlContent = @'
         refreshThemeToggleLabel();
     }
     refreshThemeToggleLabel();
+
+    function renderCheckCell(c) {
+        if (c === "WARN") return "<span style=\"color:var(--text-warning-soft); font-weight:bold;\">WARN</span>";
+        return escapeHtml(c);
+    }
 
     function escapeHtml(str) {
         return String(str)
@@ -1772,6 +1806,13 @@ $htmlContent = @'
             }
         }
 
+        // Per-host and per-VM active-memory thresholds (#38). The cluster badge above only looks at
+        // the aggregate, which can hide a single hot host or VM behind idle neighbours.
+        var activeRiskDiv = document.getElementById('rowActiveRiskWarn');
+        var activeRiskLines = describeActiveRisks(collectActiveRisks(cachedHosts, cachedVms));
+        activeRiskDiv.innerText = activeRiskLines.join("\n");
+        activeRiskDiv.style.display = activeRiskLines.length > 0 ? 'block' : 'none';
+
         var cpuB = document.getElementById('badgeBaseCpu');
         cpuB.innerText = globalCpu <= 50 ? "[ \u2713 ] PASS" : "[ X ] WARN";
         cpuB.className = globalCpu <= 50 ? "badge badge-pass" : "badge badge-warn";
@@ -1808,7 +1849,7 @@ $htmlContent = @'
             // Cluster/HostName/Tiering can originate from a live vCenter object name OR an offline
             // CSV import (an arbitrary file picked from disk) -- escaped like every other dynamic
             // value in this function, rather than trusted as always-safe plain text.
-            hBody.innerHTML += "<tr" + rowStyle + "><td>" + escapeHtml(h.Cluster) + "</td><td>" + escapeHtml(h.HostName) + "</td><td>" + escapeHtml(h.Tiering) + "</td><td>" + escapeHtml(h.TieringSupport || "Unknown") + "</td><td>" + h.CPU_Pct + "%</td><td>" + h.Physical_RAM + "</td><td>" + h.Consumed_GB + "</td><td>" + h.Active_GB + "</td><td>" + h.Active_Pct + "%</td></tr>";
+            hBody.innerHTML += "<tr" + rowStyle + "><td>" + escapeHtml(h.Cluster) + "</td><td>" + escapeHtml(h.HostName) + "</td><td>" + escapeHtml(h.Tiering) + "</td><td>" + escapeHtml(h.TieringSupport || "Unknown") + "</td><td>" + h.CPU_Pct + "%</td><td>" + h.Physical_RAM + "</td><td>" + h.Consumed_GB + "</td><td>" + h.Active_GB + "</td><td>" + h.Active_Pct + "%</td><td>" + renderCheckCell(hostActiveCheck(h)) + "</td><td>" + escapeHtml(h.VM_Demand_GB === undefined ? "N/A" : h.VM_Demand_GB) + "</td><td>" + renderCheckCell(h.VM_Demand_Check || "N/A") + "</td></tr>";
         }
 
         var vBody = document.querySelector('#vmTable tbody'); vBody.innerHTML = "";
@@ -1817,7 +1858,7 @@ $htmlContent = @'
             var pinnedCell = (v.Pinned_Memory === "Yes")
                 ? "<span style=\"color:var(--text-warning-soft); font-weight:bold;\">Yes</span>"
                 : escapeHtml(v.Pinned_Memory || "N/A");
-            vBody.innerHTML += "<tr><td>" + escapeHtml(v.Host) + "</td><td>" + escapeHtml(v.VMName) + "</td><td>" + v.Provisioned_GB + "</td><td>" + v.Active_GB + "</td><td>" + v.Active_Pct + "%</td><td>" + pinnedCell + "</td><td>" + escapeHtml(v.Pages_1GB) + "</td><td>" + escapeHtml(v.Pages_2MB) + "</td><td>" + escapeHtml(v.vCPU === undefined || v.vCPU === null ? "N/A" : v.vCPU) + "</td><td>" + escapeHtml(v.Tiering_Notes || "") + "</td></tr>";
+            vBody.innerHTML += "<tr><td>" + escapeHtml(v.Host) + "</td><td>" + escapeHtml(v.VMName) + "</td><td>" + v.Provisioned_GB + "</td><td>" + v.Active_GB + "</td><td>" + v.Active_Pct + "%</td><td>" + pinnedCell + "</td><td>" + escapeHtml(v.Pages_1GB) + "</td><td>" + escapeHtml(v.Pages_2MB) + "</td><td>" + escapeHtml(v.vCPU === undefined || v.vCPU === null ? "N/A" : v.vCPU) + "</td><td>" + escapeHtml(v.Tiering_Notes || "") + "</td><td>" + escapeHtml(v.Active_Avg_GB === undefined || v.Active_Avg_GB === "" ? "N/A" : v.Active_Avg_GB) + "</td><td>" + escapeHtml(v.DRAM_Share_GB === undefined || v.DRAM_Share_GB === "" ? "N/A" : v.DRAM_Share_GB) + "</td><td>" + renderCheckCell(v.DRAM_Fit || "N/A") + "</td></tr>";
         }
 
         document.getElementById('simClusterSelect').value = activeClusterValue;
@@ -2044,6 +2085,40 @@ $htmlContent = @'
             reasons.push("your VMs consume " + f.consumedGB + " GB of memory; a larger Target Node Capacity consolidates into fewer hosts");
         }
         return "The workload needs " + f.workloadHosts + " host" + (f.workloadHosts > 1 ? "s" : "") + " because " + reasons.join("; and ") + "." + haText;
+    }
+
+    // M-WL-01: older imports carry no Active_Check, so it is recomputed from the host peak.
+    function hostActiveCheck(h) {
+        if (h.Tiering === "ERROR") return "UNKNOWN";
+        if (h.Active_Check) return h.Active_Check;
+        var ram = parseFloat(h.Physical_RAM), act = parseFloat(h.Active_GB);
+        if (!(ram > 0) || isNaN(act)) return "UNKNOWN";
+        return (act <= ram * 0.5) ? "PASS" : "WARN";
+    }
+
+    // Hosts and VMs that break the active-memory thresholds of #38 (M-WL-01..03).
+    function collectActiveRisks(hosts, vms) {
+        var r = { hostPeak: [], hostDemand: [], vms: [] };
+        (hosts || []).forEach(function(h) {
+            if (hostActiveCheck(h) === "WARN") r.hostPeak.push(h.HostName + " (" + h.Active_Pct + "%)");
+            if (h.VM_Demand_Check === "WARN") r.hostDemand.push(h.HostName + " (" + h.VM_Demand_GB + " of " + h.Physical_RAM + " GB)");
+        });
+        (vms || []).forEach(function(v) {
+            if (v.DRAM_Fit === "WARN") r.vms.push(v.VMName + " (" + v.Active_Avg_GB + " of " + v.DRAM_Share_GB + " GB)");
+        });
+        return r;
+    }
+
+    function describeActiveRisks(r) {
+        var listOf = function(arr) {
+            var max = 8;
+            return arr.slice(0, max).join(", ") + (arr.length > max ? " and " + (arr.length - max) + " more (see the tables or the CSV export)" : "");
+        };
+        var lines = [];
+        if (r.hostPeak.length > 0) lines.push("[ ! ] " + r.hostPeak.length + " host(s) with peak Active Memory above 50% of DRAM (M-WL-01): " + listOf(r.hostPeak));
+        if (r.hostDemand.length > 0) lines.push("[ ! ] " + r.hostDemand.length + " host(s) whose VM demand exceeds DRAM (M-WL-03): " + listOf(r.hostDemand));
+        if (r.vms.length > 0) lines.push("[ ! ] " + r.vms.length + " VM(s) whose average Active Memory exceeds their DRAM share (M-WL-02): " + listOf(r.vms));
+        return lines;
     }
 
     function runSimulationMath() {
@@ -2537,16 +2612,16 @@ $htmlContent = @'
             return csv;
         }
         if (type === 'hosts') {
-            csv = "Cluster,HostName,Tiering,CPU_Pct,Physical_RAM,Consumed_GB,Active_GB,Active_Pct,TieringSupport\r\n";
+            csv = "Cluster,HostName,Tiering,CPU_Pct,Physical_RAM,Consumed_GB,Active_GB,Active_Pct,TieringSupport,Active_Check,VM_Demand_GB,VM_Demand_Check\r\n";
             for (var j = 0; j < cachedHosts.length; j++) {
-                var h = cachedHosts[j]; csv += csvField(h.Cluster) + "," + csvField(h.HostName) + "," + csvField(h.Tiering) + "," + h.CPU_Pct + "," + h.Physical_RAM + "," + h.Consumed_GB + "," + h.Active_GB + "," + h.Active_Pct + "," + csvField(h.TieringSupport || "Unknown") + "\r\n";
+                var h = cachedHosts[j]; csv += csvField(h.Cluster) + "," + csvField(h.HostName) + "," + csvField(h.Tiering) + "," + h.CPU_Pct + "," + h.Physical_RAM + "," + h.Consumed_GB + "," + h.Active_GB + "," + h.Active_Pct + "," + csvField(h.TieringSupport || "Unknown") + "," + csvField(hostActiveCheck(h)) + "," + csvField(h.VM_Demand_GB === undefined ? "" : h.VM_Demand_GB) + "," + csvField(h.VM_Demand_Check || "") + "\r\n";
             }
             return csv;
         }
         if (type === 'vms') {
-            csv = "Host,VMName,Provisioned_GB,Active_GB,Active_Pct,Pinned_Memory,Pages_1GB,Pages_2MB,vCPU,Tiering_Notes\r\n";
+            csv = "Host,VMName,Provisioned_GB,Active_GB,Active_Pct,Pinned_Memory,Pages_1GB,Pages_2MB,vCPU,Tiering_Notes,Active_Avg_GB,DRAM_Share_GB,DRAM_Fit\r\n";
             for (var k = 0; k < cachedVms.length; k++) {
-                var v = cachedVms[k]; csv += csvField(v.Host) + "," + csvField(v.VMName) + "," + v.Provisioned_GB + "," + v.Active_GB + "," + v.Active_Pct + "," + csvField(v.Pinned_Memory || "N/A") + "," + csvField(v.Pages_1GB) + "," + csvField(v.Pages_2MB) + "," + csvField(v.vCPU === undefined || v.vCPU === null ? "N/A" : v.vCPU) + "," + csvField(v.Tiering_Notes || "") + "\r\n";
+                var v = cachedVms[k]; csv += csvField(v.Host) + "," + csvField(v.VMName) + "," + v.Provisioned_GB + "," + v.Active_GB + "," + v.Active_Pct + "," + csvField(v.Pinned_Memory || "N/A") + "," + csvField(v.Pages_1GB) + "," + csvField(v.Pages_2MB) + "," + csvField(v.vCPU === undefined || v.vCPU === null ? "N/A" : v.vCPU) + "," + csvField(v.Tiering_Notes || "") + "," + csvField(v.Active_Avg_GB === undefined ? "" : v.Active_Avg_GB) + "," + csvField(v.DRAM_Share_GB === undefined ? "" : v.DRAM_Share_GB) + "," + csvField(v.DRAM_Fit || "") + "\r\n";
             }
             return csv;
         }
@@ -2572,8 +2647,8 @@ $htmlContent = @'
         // can be ambiguous, not just one. ClusterContext is still included alongside for
         // readability when the CSV is opened directly, and as a fallback when re-importing an older
         // exported file that predates these two columns.
-        var globalHostCsv = "Cluster,RangeName,ClusterContext,HostName,Tiering,CPU_Pct,Physical_RAM,Consumed_GB,Active_GB,Active_Pct,TieringSupport\r\n";
-        var globalVmCsv = "Cluster,RangeName,ClusterContext,Host,VMName,Provisioned_GB,Active_GB,Active_Pct,Pinned_Memory,Pages_1GB,Pages_2MB,vCPU,Tiering_Notes\r\n";
+        var globalHostCsv = "Cluster,RangeName,ClusterContext,HostName,Tiering,CPU_Pct,Physical_RAM,Consumed_GB,Active_GB,Active_Pct,TieringSupport,Active_Check,VM_Demand_GB,VM_Demand_Check\r\n";
+        var globalVmCsv = "Cluster,RangeName,ClusterContext,Host,VMName,Provisioned_GB,Active_GB,Active_Pct,Pinned_Memory,Pages_1GB,Pages_2MB,vCPU,Tiering_Notes,Active_Avg_GB,DRAM_Share_GB,DRAM_Fit\r\n";
 
         for (var clusterKey in clusterSessionCache) {
             var cache = clusterSessionCache[clusterKey];
@@ -2585,11 +2660,11 @@ $htmlContent = @'
                 var clusterContext = csvField(cName + " (" + rName + ")");
                 var hArr = dataObj.hosts || [];
                 for (var x = 0; x < hArr.length; x++) {
-                    var h = hArr[x]; globalHostCsv += safeCluster + "," + safeRange + "," + clusterContext + "," + csvField(h.HostName) + "," + csvField(h.Tiering) + "," + h.CPU_Pct + "," + h.Physical_RAM + "," + h.Consumed_GB + "," + h.Active_GB + "," + h.Active_Pct + "," + csvField(h.TieringSupport || "Unknown") + "\r\n";
+                    var h = hArr[x]; globalHostCsv += safeCluster + "," + safeRange + "," + clusterContext + "," + csvField(h.HostName) + "," + csvField(h.Tiering) + "," + h.CPU_Pct + "," + h.Physical_RAM + "," + h.Consumed_GB + "," + h.Active_GB + "," + h.Active_Pct + "," + csvField(h.TieringSupport || "Unknown") + "," + csvField(hostActiveCheck(h)) + "," + csvField(h.VM_Demand_GB === undefined ? "" : h.VM_Demand_GB) + "," + csvField(h.VM_Demand_Check || "") + "\r\n";
                 }
                 var vArr = dataObj.vms || [];
                 for (var y = 0; y < vArr.length; y++) {
-                    var v = vArr[y]; globalVmCsv += safeCluster + "," + safeRange + "," + clusterContext + "," + csvField(v.Host) + "," + csvField(v.VMName) + "," + v.Provisioned_GB + "," + v.Active_GB + "," + v.Active_Pct + "," + csvField(v.Pinned_Memory || "N/A") + "," + csvField(v.Pages_1GB) + "," + csvField(v.Pages_2MB) + "," + csvField(v.vCPU === undefined || v.vCPU === null ? "N/A" : v.vCPU) + "," + csvField(v.Tiering_Notes || "") + "\r\n";
+                    var v = vArr[y]; globalVmCsv += safeCluster + "," + safeRange + "," + clusterContext + "," + csvField(v.Host) + "," + csvField(v.VMName) + "," + v.Provisioned_GB + "," + v.Active_GB + "," + v.Active_Pct + "," + csvField(v.Pinned_Memory || "N/A") + "," + csvField(v.Pages_1GB) + "," + csvField(v.Pages_2MB) + "," + csvField(v.vCPU === undefined || v.vCPU === null ? "N/A" : v.vCPU) + "," + csvField(v.Tiering_Notes || "") + "," + csvField(v.Active_Avg_GB === undefined ? "" : v.Active_Avg_GB) + "," + csvField(v.DRAM_Share_GB === undefined ? "" : v.DRAM_Share_GB) + "," + csvField(v.DRAM_Fit || "") + "\r\n";
                 }
             }
         }
@@ -2753,7 +2828,8 @@ $htmlContent = @'
 
             hosts.push({
                 Cluster: r.Cluster || "", HostName: r.HostName || "", Tiering: tiering, TieringSupport: r.TieringSupport || "Unknown", TierRatioPct: 100,
-                CPU_Pct: cpuPct, Physical_RAM: physRam, Consumed_GB: consumed, Active_GB: active, Active_Pct: activePct
+                CPU_Pct: cpuPct, Physical_RAM: physRam, Consumed_GB: consumed, Active_GB: active, Active_Pct: activePct,
+                Active_Check: r.Active_Check || "", VM_Demand_GB: r.VM_Demand_GB || "", VM_Demand_Check: r.VM_Demand_Check || ""
             });
 
             dramSum += physRam; consumedSum += consumed; activeSum += active; cpuSum += cpuPct;
@@ -2780,7 +2856,8 @@ $htmlContent = @'
                 if (isNaN(vActivePct)) vActivePct = provisioned > 0 ? Math.round((vActive / provisioned) * 1000) / 10 : 0;
                 vms.push({
                     Host: v.Host || "", VMName: v.VMName || "", Provisioned_GB: provisioned, Active_GB: vActive,
-                    Active_Pct: vActivePct, Pinned_Memory: v.Pinned_Memory || "N/A", Pages_1GB: v.Pages_1GB || "N/A", Pages_2MB: v.Pages_2MB || "N/A", vCPU: v.vCPU || "N/A", Tiering_Notes: v.Tiering_Notes || ""
+                    Active_Pct: vActivePct, Pinned_Memory: v.Pinned_Memory || "N/A", Pages_1GB: v.Pages_1GB || "N/A", Pages_2MB: v.Pages_2MB || "N/A", vCPU: v.vCPU || "N/A", Tiering_Notes: v.Tiering_Notes || "",
+                    Active_Avg_GB: v.Active_Avg_GB || "", DRAM_Share_GB: v.DRAM_Share_GB || "", DRAM_Fit: v.DRAM_Fit || ""
                 });
             }
         }
@@ -3068,7 +3145,8 @@ $htmlContent = @'
 
                 g.hosts.push({
                     Cluster: ctx.clusterName, HostName: r.HostName || "", Tiering: r.Tiering || "Unknown", TieringSupport: r.TieringSupport || "Unknown", TierRatioPct: 100,
-                    CPU_Pct: cpuPct, Physical_RAM: physRam, Consumed_GB: consumed, Active_GB: active, Active_Pct: activePct
+                    CPU_Pct: cpuPct, Physical_RAM: physRam, Consumed_GB: consumed, Active_GB: active, Active_Pct: activePct,
+                    Active_Check: r.Active_Check || "", VM_Demand_GB: r.VM_Demand_GB || "", VM_Demand_Check: r.VM_Demand_Check || ""
                 });
                 g.dramSum += physRam; g.consumedSum += consumed; g.activeSum += active; g.cpuSum += cpuPct; g.hostCount++;
             }
@@ -3089,7 +3167,8 @@ $htmlContent = @'
 
                 vg.vms.push({
                     Host: v.Host || "", VMName: v.VMName || "", Provisioned_GB: provisioned, Active_GB: vActive,
-                    Active_Pct: vActivePct, Pinned_Memory: v.Pinned_Memory || "N/A", Pages_1GB: v.Pages_1GB || "N/A", Pages_2MB: v.Pages_2MB || "N/A", vCPU: v.vCPU || "N/A", Tiering_Notes: v.Tiering_Notes || ""
+                    Active_Pct: vActivePct, Pinned_Memory: v.Pinned_Memory || "N/A", Pages_1GB: v.Pages_1GB || "N/A", Pages_2MB: v.Pages_2MB || "N/A", vCPU: v.vCPU || "N/A", Tiering_Notes: v.Tiering_Notes || "",
+                    Active_Avg_GB: v.Active_Avg_GB || "", DRAM_Share_GB: v.DRAM_Share_GB || "", DRAM_Fit: v.DRAM_Fit || ""
                 });
             }
         }
@@ -3766,6 +3845,8 @@ while ($listener.IsListening) {
                     }
 
                     $currentHostName = $h.Name
+                    $hostWorkloadRatioPct = Get-WorkloadTierRatioPct $hostIsTiered $hostTierRatioPct
+                    $hostVmDemandGB = 0
                     $hostVMs = $allVMs | Where-Object { $_.VMHost.Name -eq $currentHostName }
                     foreach ($vm in $hostVMs) {
                       try {
@@ -3822,12 +3903,29 @@ while ($listener.IsListening) {
                         if ($vmTieringNotes) {
                             Write-DebugLog "[analyze] WARNING: VM '$($vm.Name)' on host '$currentHostName' (ESXi $($h.Version)): $vmTieringNotes"
                         }
+                        # M-WL-02: the VM's average active memory must fit its DRAM share. VMs that
+                        # stay entirely in DRAM (pinned, or excluded with sched.mem.enableTiering=FALSE)
+                        # are not split, so the check does not apply; they count with their full memory
+                        # in the host-level demand below (M-WL-03).
+                        $vmDramOnly = ($pinnedMemory -eq "Yes" -or $vmTieringDisabled)
+                        if ($vmDramOnly) {
+                            $vmDramShareGB = [math]::Round([double]$vm.MemoryGB, 2); $vmDramFit = "DRAM-only"; $vmDemandGB = [double]$vm.MemoryGB
+                        } else {
+                            $vmDramShareGB = Get-VmDramShareGB $vm.MemoryGB $hostWorkloadRatioPct
+                            $vmDramFit = if ($activeGB_Avg -le $vmDramShareGB) { "PASS" } else { "WARN" }
+                            $vmDemandGB = [double]$activeGB_Avg
+                        }
+                        if ($vmDramFit -eq "WARN") {
+                            Write-DebugLog "[analyze] WARNING: VM '$($vm.Name)' on host '$currentHostName': average active $activeGB_Avg GB exceeds its DRAM share $vmDramShareGB GB (ratio $hostWorkloadRatioPct%) -- M-WL-02"
+                        }
                         $totalActiveGB_Avg += $activeGB_Avg
+                        $hostVmDemandGB += $vmDemandGB
                         $vmResults.Add([PSCustomObject]@{
                             Host = $currentHostName; VMName = $vm.Name; Provisioned_GB = [math]::Round($vm.MemoryGB); Active_GB = $activeGB
                             Active_Pct = if($vm.MemoryGB -gt 0){[math]::Round(($activeGB/$vm.MemoryGB)*100,1)}else{0}; Pinned_Memory = $pinnedMemory
                             Pages_1GB = $page1GB; Pages_2MB = $page2MB
                             vCPU = $vmNumCpu; Tiering_Notes = $vmTieringNotes
+                            Active_Avg_GB = $activeGB_Avg; DRAM_Share_GB = $vmDramShareGB; DRAM_Fit = $vmDramFit
                         })
                       } catch {
                         $failedVmNames.Add("$currentHostName/$($vm.Name)")
@@ -3852,10 +3950,24 @@ while ($listener.IsListening) {
                     $totalConsumedMemGB_Sum += $hostConsumedMemGB
                     $totalActiveGB += $hostActiveGB
 
+                    # M-WL-01 on the host peak; M-WL-03 on the VM demand (average active of the tiered
+                    # VMs plus the full memory of DRAM-only VMs) against the host DRAM. Kernel memory is
+                    # not subtracted yet (open point of #39), so M-WL-03 is optimistic by that amount.
+                    $hostActiveCheck = Get-HostActiveCheck $hostActiveGB $hostDramGB
+                    $hostVmDemandGB = [math]::Round($hostVmDemandGB, 2)
+                    $hostVmDemandCheck = if ($hostDramGB -le 0) { "UNKNOWN" } elseif ($hostVmDemandGB -le $hostDramGB) { "PASS" } else { "WARN" }
+                    if ($hostActiveCheck -eq "WARN") {
+                        Write-DebugLog "[analyze] WARNING: host '$currentHostName': peak active $hostActiveGB GB is above 50% of DRAM ($hostDramGB GB) -- M-WL-01"
+                    }
+                    if ($hostVmDemandCheck -eq "WARN") {
+                        Write-DebugLog "[analyze] WARNING: host '$currentHostName': VM demand $hostVmDemandGB GB (average active + DRAM-only VMs) exceeds DRAM ($hostDramGB GB) -- M-WL-03"
+                    }
+
                     $hostResults.Add([PSCustomObject]@{
                         Cluster      = $clusterName
                         HostName     = $currentHostName; Tiering = $hostIsTiered; TieringSupport = $hostTieringSupport; TierRatioPct = $hostTierRatioPct; CPU_Pct = [math]::Round($hostCpuPct, 1)
                         Physical_RAM = $hostDramGB; Consumed_GB = $hostConsumedMemGB; Active_GB = $hostActiveGB; Active_Pct = if($hostDramGB -gt 0){[math]::Round(($hostActiveGB/$hostDramGB)*100,1)}else{0}
+                        Active_Check = $hostActiveCheck; VM_Demand_GB = $hostVmDemandGB; VM_Demand_Check = $hostVmDemandCheck
                     })
                     Write-DebugLog "[analyze] Host '$currentHostName' (ESXi $($h.Version), support: $hostTieringSupport): Tiering='$hostIsTiered' (ratio $hostTierRatioPct%), DRAM $hostDramGB GB, consumed $hostConsumedMemGB GB, active $hostActiveGB GB, $(@($hostVMs).Count) powered-on VM(s)."
                   } catch {
@@ -3864,6 +3976,7 @@ while ($listener.IsListening) {
                     $hostResults.Add([PSCustomObject]@{
                         Cluster = $clusterName; HostName = $h.Name; Tiering = "ERROR"; TieringSupport = (Get-TieringSupportLevel $h.Version); TierRatioPct = 0; CPU_Pct = 0
                         Physical_RAM = 0; Consumed_GB = 0; Active_GB = 0; Active_Pct = 0
+                        Active_Check = "UNKNOWN"; VM_Demand_GB = 0; VM_Demand_Check = "UNKNOWN"
                     })
                   }
                 }

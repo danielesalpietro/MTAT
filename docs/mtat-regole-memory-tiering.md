@@ -1,6 +1,6 @@
 # MTAT: come applica i requisiti del Memory Tiering
 
-**Stato**: bozza v0.5 (2026-10-14). Epic #36, sub-issue #37–#42.
+**Stato**: bozza v0.6 (2026-10-14). Epic #36, sub-issue #37–#42.
 **Requisiti di riferimento**: [`vsphere-memory-tiering-requisiti.md`](vsphere-memory-tiering-requisiti.md);
 analisi di fattibilità e ordine di lavoro: [`vsphere-memory-tiering-fattibilita.md`](vsphere-memory-tiering-fattibilita.md)
 (specifica dei requisiti vSphere 9.1, ID `SW-`, `NV-`, `HW-`, `FN-`, `CP-`, `MN-`, `SM-`, `DR-`, …).
@@ -54,6 +54,19 @@ colonna "Support", export CSV, log) e `vcenterTieringSupport` nella risposta di 
 | M-WL-02 | CP-03 | AUTO per VM | active medio della VM ≤ DRAM disponibile alla VM (dal ratio) → altrimenti WARN e VM elencata |
 | M-WL-03 | CP-05 | AUTO per host | somma dell'active delle VM ≤ DRAM disponibile alle VM |
 | M-WL-04 | soglia ~80% (spec. §12 punto 7) | NOTE + checklist | consumed < 80% → "il tiering non si attiverebbe oggi" |
+
+**Implementato (#38)** per M-WL-01…03, nel motore (`api/analyze`), nelle tabelle, nell'export CSV e
+nella checklist (elenco di host e VM oltre soglia):
+
+| ID | Campi | Calcolo |
+|---|---|---|
+| M-WL-01 | host `Active_Check` | picco active dell'host ≤ 50% della DRAM → `PASS`, altrimenti `WARN`; `UNKNOWN` se la DRAM non è nota. Gli import senza il campo lo ricalcolano dal picco. |
+| M-WL-02 | VM `Active_Avg_GB`, `DRAM_Share_GB`, `DRAM_Fit` | quota DRAM della VM = memoria × 100 / (100 + r), con r = ratio NVMe in % della DRAM: quello reale se il tiering è attivo, altrimenti il 1:1 pianificato (quindi vale anche come pre-assessment). `PASS` se l'active medio ≤ quota, altrimenti `WARN`. Le VM DRAM-only (pinned o `sched.mem.enableTiering = FALSE`) hanno esito `DRAM-only` e quota pari a tutta la memoria. |
+| M-WL-03 | host `VM_Demand_GB`, `VM_Demand_Check` | domanda = active medio delle VM tierizzabili + memoria intera delle VM DRAM-only; `PASS` se ≤ DRAM dell'host. La memoria del kernel non è ancora sottratta (punto aperto di #39), quindi il controllo è ottimistico di quella quantità. |
+
+In Real-Time il valore medio coincide con quello istantaneo. Gli altri profili DRAM-only (§2.3: Low
+Latency, FT, Confidential…) entreranno nei controlli quando MTAT li rileverà. Validato sul gemello
+digitale, scenario `mixed-90`.
 
 ### 2.3 Profili VM esclusi dal tiering (#38, #42)
 
@@ -140,6 +153,7 @@ sizing (§2.4). Diagnostica post-attivazione: `memstats` (vmtier-stats), secondo
 
 | Versione | Data | Modifiche |
 |---|---|---|
+| 0.6 | 2026-10-14 | M-WL-01…03 implementati (soglie active per host e VM, #38) |
 | 0.5 | 2026-10-14 | M-VM-10 (> 60 vCPU su 9.0) implementato |
 | 0.4 | 2026-10-14 | GA 9.0 confermata (RN VCF 9.0), M-VER implementato (#37) |
 | 0.3 | 2026-10-14 | GA = 9.0 (decisione di Daniele); lab 9.x (#44), base dati BCG (#45), scheda Brownfield (#46) |
