@@ -3,6 +3,13 @@
 Sessione cloud (claude.ai/code) di coordinamento. Etichetta `sessione:cloud-coordinamento`.
 Regole in `CLAUDE.md`. Voce più recente in alto.
 
+## 2026-10-14 12:25: inventario sistemi (assets)
+- **Obiettivo**: un riferimento unico ai sistemi (vCenter, ESXi…), con utenti e percorso delle password.
+- **Fatto**: 53be209: `assets.md` versionato con solo formato e regole (fork pubblico);
+  dati reali in `assets.local.md` gitignored sul PC locale; password solo come percorso di file locale.
+  `.gitignore` per segreti. Regole aggiunte a `CLAUDE.md`.
+- **Aperto**: la sessione locale crea `assets.local.md` e registra `vc-lab-01`.
+
 ## 2026-10-14 12:15: organizzazione del progetto
 - **Obiettivo**: impostare le regole di lavoro tra sessioni.
 - **Fatto**: `CLAUDE.md` (direttive), template issue, logbook per sessione, etichette
