@@ -4,6 +4,31 @@ Sessione locale sul PC Windows di Daniele (Claude Desktop, titolo "MTAT Locale -
 Etichetta `sessione:locale-windows`. Regole in `CLAUDE.md`. Voce più recente in alto.
 Orari in ora locale (CEST, UTC+2).
 
+## 2026-10-14 16:25: verifica di #25 su vCenter reale
+- **Obiettivo**: verificare la gestione "nessun cluster" e "login fallito" (72ef773, c2700dd, 94cd510).
+- **Fatto**: due build (c2700dd, poi 94cd510/d0850ea) con l'ok di Daniele. Esiti commentati su #25.
+  Il rilievo sulle fonti di import inutilizzabili senza cluster è rimandato a #26, d'accordo con
+  la sessione di coordinamento.
+- **Verifiche**:
+  - c2700dd, account RO senza ruolo: `Connect-VIServer` negato (`System.View` su `group-d1`), ma la
+    UI mostrava "(no clusters found)". Bug, corretto in 94cd510.
+  - Dopo l'assegnazione del ruolo Read-only: `0 cluster(s) found`; UI con menu cluster disattivato,
+    Analyze disattivato, Import attivo (screenshot di Daniele).
+  - 94cd510: password errata → resta in Fase 1 con errore rosso; password corretta → Fase 2 con
+    "no clusters". Conforme.
+- **Aperto**: hint System.View non riverificato dal vero (ruolo ormai assegnato). #15 riprende
+  quando i blade ESXi saranno in un cluster di `vc-lab-01`.
+
+## 2026-10-14 15:10: vc-lab-01, login e nuove issue
+- **Obiettivo**: primo collegamento di MTAT in container a un vCenter reale (#15).
+- **Fatto**: `vc-lab-01` aggiunto in `assets.local.md`. Login prima con account amministrativo
+  (eccezione decisa da Daniele, annotata su #15), poi con account di sola lettura dedicato. Aperte
+  #24 (ambito di analisi cluster/host) e #26 (fonti dati: RVTools xlsx, Live Optics, template), con
+  lo scenario partner/system integrator e l'import standalone come requisito chiave.
+- **Verifiche**: 443 raggiungibile da host e container; API vCenter più alta 8.0.0.1 (probabile
+  8.0 GA, mentre il tiering richiede 8.0 U3). Verificato che MTAT esegue solo letture su vSphere.
+- **Aperto**: build di vCenter/ESXi da confermare (#22). Nessun cluster nel lab.
+
 ## 2026-10-14 14:40: verifica di #9, #21, #23 sul nuovo build
 - **Obiettivo**: verificare le correzioni e0851b8 (#9, #21) e 2fb223c (#23) in container.
 - **Fatto**: `docker compose up -d --build` su 9986baf, con l'ok di Daniele in chat. La stessa
