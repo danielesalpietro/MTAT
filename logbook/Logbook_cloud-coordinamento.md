@@ -3,6 +3,15 @@
 Sessione cloud (claude.ai/code) di coordinamento. Etichetta `sessione:cloud-coordinamento`.
 Regole in `CLAUDE.md`. Voce più recente in alto.
 
+## 2026-10-14 19:40: merge della PR #27 su main
+- **Fatto**: su richiesta di Daniele, descrizione della PR aggiornata (#29, #30, #32, #35) e merge
+  (merge commit 8d4a126, head 1034dbb, CI verde). Chiudono al merge: #9, #21, #23, #25, #30, #32, #35.
+  Branch di integrazione riallineato a `main` per il lavoro successivo; sottoscrizione alla PR e
+  check-in rimossi.
+- **Aperto**: verifica sul PC di #32/#35 (build 1034dbb in corso). Pagina Broadcom "Memory Tiering
+  considerations and best practices" (vSphere 9.1) per #36: non raggiungibile dalla rete della
+  sessione cloud (403 dal proxy) → lettura affidata a `locale-windows`.
+
 ## 2026-10-14 19:45: #35 Sizing Rationale Greenfield
 - **Obiettivo**: con 1 host di carico + 1 nodo HA il testo diceva "2 hosts because your current CPU
   workload would overload fewer servers" a CPU 0,9% (segnalato da `locale-windows`, #35).
