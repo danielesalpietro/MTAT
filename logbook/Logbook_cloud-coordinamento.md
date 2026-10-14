@@ -3,6 +3,28 @@
 Sessione cloud (claude.ai/code) di coordinamento. Etichetta `sessione:cloud-coordinamento`.
 Regole in `CLAUDE.md`. Voce più recente in alto.
 
+## 2026-10-14 23:05: merge PR #51 e regole di sizing NVMe (#39)
+- **Fatto**:
+  - merge di #51 (d578f6a, CI verde) su richiesta di Daniele; branch riallineato a `main`;
+  - #39 (a6c0602):
+    - campo "ESXi System Memory" (default 0) sottratto dalla DRAM per l'active;
+    - in Greenfield, la DRAM minima include le VM DRAM-only;
+    - avvisi per NVMe < DRAM e per l'assenza di mirroring;
+    - ratio personalizzato limitato a 1–400%;
+    - nota sull'overhead CPU.
+
+    Regole aggiornate alla v0.7.
+- **Verifiche**:
+  - `node tests/sizing.test.js` → ALL OK;
+  - simulatore via Playwright sul gemello, immagine di `main` contro quella nuova:
+    - `lab-802`: numeri identici, cambiano solo gli avvisi;
+    - `mixed-90`: in Greenfield gli host passano da 3 a 6 per i 696 GB di VM DRAM-only, come atteso;
+    - nessun errore JS.
+- **Aperto**:
+  - valore di default della memoria di sistema ESXi (fonte o dato rilevato), decisione di Daniele;
+  - branch `claude/brownfield-checklist-tab` di un'altra sessione: nessun conflitto con questo
+    lavoro; la sessione va registrata in `CLAUDE.md`.
+
 ## 2026-10-14 22:40: soglie Active per host e VM (#38) e nuova issue #50
 - **Obiettivo**: implementare M-WL-01…03 (picco active ≤ 50% DRAM per host, active medio della VM
   nella sua quota DRAM, domanda delle VM ≤ DRAM dell'host).
