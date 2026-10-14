@@ -1992,6 +1992,32 @@ $htmlContent = @'
         }
     }
 
+    // Greenfield "Sizing Rationale" text for the tiered option. Kept free of DOM access so it can be
+    // tested in isolation (#4). Workload hosts and HA nodes are explained separately: the old wording
+    // used the total (workload + HA) and picked a single limiting factor through an if/else chain, so
+    // a 1-host workload plus 1 HA node read "2 hosts because your CPU workload would overload fewer
+    // servers" at 0.9% CPU (#35).
+    function describeTieredSizing(f) {
+        var total = f.workloadHosts + f.haNodes;
+        var haText = f.haNodes > 0
+            ? " Plus " + f.haNodes + " HA node" + (f.haNodes > 1 ? "s" : "") + " for failover, " + total + " hosts in total."
+            : "";
+        if (Math.max(f.reqConsumed, f.reqCpu, f.reqActive) <= 1) {
+            return "The current workload (" + f.consumedGB + " GB consumed, " + f.activeGB + " GB active) fits on a single host: no capacity constraint requires more." + haText;
+        }
+        var reasons = [];
+        if (f.reqActive === f.workloadHosts) {
+            reasons.push("Active Memory (" + f.activeGB + " GB) must stay within 50% of each host's DRAM tier to protect performance; a larger Target Node Capacity (or a DRAM-heavier ratio) lowers this");
+        }
+        if (f.reqCpu === f.workloadHosts) {
+            reasons.push("the current CPU workload would push fewer servers above the 80% per-host cap; increase 'New Node CPU Capacity' if buying faster servers");
+        }
+        if (f.reqConsumed === f.workloadHosts) {
+            reasons.push("your VMs consume " + f.consumedGB + " GB of memory; a larger Target Node Capacity consolidates into fewer hosts");
+        }
+        return "The workload needs " + f.workloadHosts + " host" + (f.workloadHosts > 1 ? "s" : "") + " because " + reasons.join("; and ") + "." + haText;
+    }
+
     function runSimulationMath() {
         var strategy = document.getElementById('simStrategy') ? document.getElementById('simStrategy').value : 'brownfield';
         var hostCount = cachedHosts.length || 1;
@@ -2115,13 +2141,11 @@ $htmlContent = @'
                 if (tieredBase < 1) tieredBase = 1;
                 tieredReqHosts = tieredBase + haNodes;
 
-                if (tieredBase === reqActive && reqActive >= Math.max(reqConsumedTiered, reqCpu)) {
-                    limitingFactorMsg = "This extra host is intentional, not a miscalculation: Active Memory (" + globalActive + " GB) must stay within 50% of each host's DRAM tier to protect performance, so " + tieredReqHosts + " hosts are required here. A larger Target Node Capacity (or a DRAM-heavier ratio) closes this cost gap while keeping that same protection.";
-                } else if (tieredBase === reqCpu && reqCpu >= Math.max(reqConsumedTiered, reqActive)) {
-                    limitingFactorMsg = "You need " + tieredReqHosts + " total hosts because your current CPU workload would overload fewer servers (capped at 80% usage per host). Increase your 'New Node CPU Capacity' if buying faster servers.";
-                } else if (tieredBase === reqConsumedTiered) {
-                    limitingFactorMsg = "You need " + tieredReqHosts + " total hosts simply because your VMs are currently consuming " + globalConsumed + " GB of memory. To consolidate into fewer hosts, select a larger Target Node Capacity.";
-                }
+                limitingFactorMsg = describeTieredSizing({
+                    reqConsumed: reqConsumedTiered, reqCpu: reqCpu, reqActive: reqActive,
+                    workloadHosts: tieredBase, haNodes: haNodes,
+                    consumedGB: globalConsumed, activeGB: globalActive
+                });
 
                 if (partitionExceeded) {
                     partitionExceededMsg = "NVMe tier allocations are automatically capped at 4TB (4,096 GB) per host to align with vSphere maximum kernel limits. Your Tiered node's deliverable capacity was reduced to " + totalNodeMem + " GB instead of the requested " + requestedNodeCap + " GB. Option A (Standard Refresh) is unaffected, since it has no NVMe tier.";

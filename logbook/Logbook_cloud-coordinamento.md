@@ -3,6 +3,17 @@
 Sessione cloud (claude.ai/code) di coordinamento. Etichetta `sessione:cloud-coordinamento`.
 Regole in `CLAUDE.md`. Voce più recente in alto.
 
+## 2026-10-14 19:45: #35 Sizing Rationale Greenfield
+- **Obiettivo**: con 1 host di carico + 1 nodo HA il testo diceva "2 hosts because your current CPU
+  workload would overload fewer servers" a CPU 0,9% (segnalato da `locale-windows`, #35).
+- **Fatto**: testo estratto in `describeTieredSizing()` (senza DOM): host di carico e nodi HA spiegati
+  a parte, caso "fits on a single host", tutti i vincoli in parità elencati. Primo test unitario
+  `tests/sizing.test.js` (#4), eseguito in CI.
+- **Verifiche**: test Node 3 scenari ok (lab, parità CPU+consumed con 2 HA, Active senza HA); UI caricata
+  in Chromium da container stub: funzioni definite, 0 errori JS.
+- **Aperto**: #34 (avviso prerequisito ESXi 8.0 U3 nel Brownfield) da specificare; #33 chiusa come
+  duplicato di #32 da `locale-windows`; costi del Sizing ricalcolati a mano da Daniele: corretti.
+
 ## 2026-10-14 19:30: #29 verificata sul PC; #32 arrotondamento totali di cluster
 - **Verifiche #29** (da `locale-windows`, ef9edab): host 8.0.2 → "Not supported (ESXi 8.0.2)";
   "2 VM trovate → 2 riportate"; nessun WARN. Casi Unknown/Enabled non verificabili sul lab.

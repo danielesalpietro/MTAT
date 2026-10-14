@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, "claude/**"]
     tags: ["v*"]
-    paths: ["MTAT_v3_1.ps1", "docker/**", "docker-compose.yml", ".dockerignore", ".github/workflows/docker-image.yml"]
+    paths: ["MTAT_v3_1.ps1", "docker/**", "tests/**", "docker-compose.yml", ".dockerignore", ".github/workflows/docker-image.yml"]
   pull_request:
   workflow_dispatch:
 
@@ -20,6 +20,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Sizing unit tests
+        run: node tests/sizing.test.js
 
       # Real build: installs PowerCLI from PSGallery (the part that can't be faked).
       - name: Build image
