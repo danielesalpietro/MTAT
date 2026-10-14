@@ -3,6 +3,10 @@
 Sessione cloud (claude.ai/code) di coordinamento. Etichetta `sessione:cloud-coordinamento`.
 Regole in `CLAUDE.md`. Voce più recente in alto.
 
+## 2026-10-14 12:30: ESXi Admin come sessione esterna
+- **Fatto**: `CLAUDE.md`: ESXi Admin gira su un altro progetto, niente remote-control: le richieste
+  al laboratorio vanno in issue `sessione:esxi-admin` e le inoltra Daniele.
+
 ## 2026-10-14 12:20: fix #9 (411 → falsi CRITICAL) e #21 (banner headless)
 - **Obiettivo**: chiudere i problemi emersi dalla validazione locale.
 - **Fatto**: richieste POST senza Content-Length (a cui HttpListener su Linux risponde da solo

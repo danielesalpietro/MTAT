@@ -24,9 +24,14 @@ Ogni sessione ha un nome stabile, un'etichetta GitHub `sessione:<nome>` e un log
 |---|---|---|---|
 | Coordinamento | `sessione:cloud-coordinamento` | cloud (claude.ai/code) | codice, CI, issue, roadmap, coordinamento delle altre sessioni |
 | Validazione locale | `sessione:locale-windows` | PC Windows di Daniele (remote-control) | prove con accesso a vCenter/ESXi, Docker Desktop, verifiche sul campo, `assets.local.md` |
-| ESXi Admin | `sessione:esxi-admin` | locale (laboratorio di Daniele) | gestione del laboratorio vSphere: accensione/configurazione di vCenter ed ESXi, Memory Tiering sugli host |
+| ESXi Admin *(esterna)* | `sessione:esxi-admin` | altro progetto, fuori dal coordinamento | gestione del laboratorio vSphere: accensione/configurazione di vCenter ed ESXi, Memory Tiering sugli host |
 
 Una nuova sessione si aggiunge qui (nome, etichetta, ruolo) prima di ricevere lavoro.
+
+**Sessioni esterne** (es. ESXi Admin): lavorano su un altro progetto e non sono raggiungibili con
+i messaggi tra sessioni. Le issue con la loro etichetta descrivono cosa serve dal laboratorio
+(stato atteso, versioni, configurazione) e **Daniele le inoltra**; l'esito viene riportato nella
+issue dalla sessione che lo verifica. Nessun dato reale del lab nelle issue: solo alias di `assets.md`.
 
 ## Issue: ogni problema diventa una issue
 
