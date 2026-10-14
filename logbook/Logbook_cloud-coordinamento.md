@@ -3,6 +3,20 @@
 Sessione cloud (claude.ai/code) di coordinamento. Etichetta `sessione:cloud-coordinamento`.
 Regole in `CLAUDE.md`. Voce più recente in alto.
 
+## 2026-10-14 20:45: gemello digitale (#47) e livelli di supporto per versione (#37)
+- **Obiettivo**: Daniele: il lab non è un collo di bottiglia, si valida MTAT su un gemello digitale;
+  procedere con #37 dopo la conferma della GA 9.0 (confermata da `locale-windows`: RN VCF 9.0).
+- **Fatto**: `twin/` (modulo PowerCLI simulato guidato da scenari JSON: lab-802, mixed-90,
+  no-clusters), `docker-compose.twin.yml`, `tests/twin-e2e.js`, job CI `twin-e2e`. #37:
+  `Get-TieringSupportLevel` (< 8.0.3 Not supported, 8.0.3 Tech preview, ≥ 9.0 Supported), campo
+  `TieringSupport` (tabella "Support", CSV, import, log), `vcenterTieringSupport`.
+- **Verifiche**: gemello in container: 3 scenari ALL OK (incl. storici 7 giorni e VM non risolvibile),
+  0 CRITICAL; lab-802 riproduce i valori di `vc-lab-01`. UI su gemello in Chromium: colonna Support
+  corretta per i 5 host, CSV con TieringSupport, 0 errori JS. `tests/sizing.test.js` ok. Il gemello ha
+  scovato un proprio bug (List[object] in Get-Stat), corretto. CI reale: in attesa.
+- **Aperto**: calibrare il gemello su registrazioni reali in sola lettura (`locale-windows`); regola
+  candidata > 60 vCPU su 9.0 (Known Issue) per #38/#41.
+
 ## 2026-10-14 20:15: fattibilità, decisioni di Daniele e nuove issue (#36)
 - **Fatto**: `docs/vsphere-memory-tiering-fattibilita.md` pubblicata da `locale-windows` (07cd020).
   Decisioni di Daniele: versioni su tre livelli con GA = 9.0 (commento #37, nota in fattibilità §2);
