@@ -4,8 +4,9 @@ Sessione cloud (claude.ai/code) di coordinamento. Etichetta `sessione:cloud-coor
 Regole in `CLAUDE.md`. Voce più recente in alto.
 
 ## 2026-10-15 00:40: merge della PR #52 (tab Brownfield)
-- **Fatto**: su richiesta di Daniele, merge di #52 (6299129) della sessione `requisiti-mt`; il branch
-  di integrazione include ora `main`.
+- **Fatto**: su richiesta di Daniele, merge di #52 (6299129) della sessione `requisiti-mt`. La PR
+  aveva come base il branch di integrazione `claude/focused-hamilton-m4loti`, non `main`: la tab
+  arriverà su `main` con la prossima PR del branch di integrazione.
 - **Verifiche**: prima del merge, il risultato di `main` + #52 è stato provato in locale, perché la
   CI di #52 era precedente a #53:
   - `node tests/sizing.test.js` → ALL OK;
