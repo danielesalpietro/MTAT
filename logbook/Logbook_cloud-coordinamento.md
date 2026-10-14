@@ -3,6 +3,17 @@
 Sessione cloud (claude.ai/code) di coordinamento. Etichetta `sessione:cloud-coordinamento`.
 Regole in `CLAUDE.md`. Voce più recente in alto.
 
+## 2026-10-14 18:55: #30 seconda correzione (CI rossa su 8b4fc92)
+- **Obiettivo**: la CI ha confermato il gate: anche il meta-modulo VMware.PowerCLI 13.3 installato
+  con `Install-Module` porta dipendenze transitive all'ultima versione (`VMware.Vcf.Sso` 13.5.1).
+- **Fatto**: `docker/install-powercli.ps1`: installazione con `Install-PSResource
+  -SkipDependencyCheck`, percorrendo i `RequiredModules` dal meta-modulo in giù a versione esatta
+  (RequiredVersion o il minimo di ModuleVersion), una sola versione per modulo, build fallita su
+  conflitti.
+- **Verifiche**: repository PSResource locale con moduli finti e versioni "esca" più nuove: installa
+  solo l'insieme coerente; `verify-powercli.ps1` passa; con una versione duplicata iniettata fallisce.
+  Installazione reale da PSGallery: affidata alla CI.
+
 ## 2026-10-14 15:45: #30 PowerCLI con versioni miste nell'immagine
 - **Obiettivo**: bug bloccante per #15 trovato da `locale-windows`: Core 13.3 con Common/Sdk 13.5 e
   VMware.Vim 9.1 → `Get-EsxCli` non carica gli assembly, VMHost vuoto, "0 VM(s)" senza WARN.
