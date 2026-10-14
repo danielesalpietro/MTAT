@@ -3,6 +3,12 @@
 Sessione cloud (claude.ai/code) di coordinamento. Etichetta `sessione:cloud-coordinamento`.
 Regole in `CLAUDE.md`. Voce più recente in alto.
 
+## 2026-10-14 21:25: merge della PR #49 su main
+- **Fatto**: su richiesta di Daniele, merge di #49 (0f6b601, head 05f4764, CI verde): regola > 60 vCPU
+  su ESX 9.0 (#38, che resta aperta per le soglie Active). Branch riallineato a `main`; sottoscrizione
+  e check-in rimossi. Gemello avviato da Daniele sul PC (`mixed-90`): valori della checklist
+  ricalcolati a mano e coerenti con lo scenario.
+
 ## 2026-10-14 21:20: regola > 60 vCPU su ESX 9.0 (#38)
 - **Fatto**: `Get-VmTieringNotes` (fonte: RN VCF 9.0 Known Issues): VM > 60 vCPU su host 9.0.x →
   nota in `Tiering_Notes` + WARN nel log; nuove colonne `vCPU` e `Tiering_Notes` (tabella VM, due export
