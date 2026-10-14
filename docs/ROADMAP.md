@@ -5,6 +5,18 @@ Obiettivo: passare da uno strumento che **misura** un cluster oggi a una piattaf
 self-hosted (vLLM) basato su una knowledge library. Un passo alla volta: ogni fase è
 utilizzabile da sola e non rompe la precedente.
 
+## Scenari d'uso
+
+| Scenario | Chi | Come raccoglie i dati |
+|---|---|---|
+| Self-assessment (MTAT v3.1 originale) | cliente finale | live dal proprio vCenter |
+| **Assessment offline** (decisione di Daniele, #26) | system integrator / partner | il cliente invia RVTools, Live Optics o un template; il partner analizza senza accesso al vCenter |
+
+Requisito chiave del secondo scenario: l'import è un'**alternativa completa** alla raccolta live,
+dalla Fase 1 della UI fino a Sizing & Savings ed export, senza connessione vCenter né cluster
+selezionato. Il percorso live esistente resta invariato. È anche la base naturale per lo storico
+multi-cliente (Fase 1 sotto) e per l'anonimizzazione.
+
 ## Fase 0: MTAT containerizzato (beta) ✅ in questo branch
 - `docker compose up -d --build` → motore v3.1 headless + PowerCLI su Linux.
 - Script originale invariato nel comportamento desktop (modalità container solo via env var).

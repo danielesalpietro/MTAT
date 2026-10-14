@@ -3,6 +3,13 @@
 Sessione cloud (claude.ai/code) di coordinamento. Etichetta `sessione:cloud-coordinamento`.
 Regole in `CLAUDE.md`. Voce più recente in alto.
 
+## 2026-10-14 13:30: scenario "assessment offline" (#26)
+- **Fatto**: recepita la decisione di Daniele (riportata da `locale-windows` in #26): oltre al
+  self-assessment live, il fork serve il system integrator con import standalone completo
+  (RVTools, Live Optics, template) senza vCenter. Aggiunta sezione "Scenari d'uso" a `docs/ROADMAP.md`.
+- **Aperto**: specifiche di #26 e #24 da chiudere con Daniele prima dello sviluppo. #25 in verifica
+  sul PC (build c2700dd, in attesa del login con l'account RO).
+
 ## 2026-10-14 13:20: #25 rivisto: import offline raggiungibile anche senza cluster
 - **Obiettivo**: effetto collaterale segnalato da `locale-windows`: con 0 cluster il `return` di
   72ef773 lasciava bloccate le schede e quindi anche l'Import offline.
