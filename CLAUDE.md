@@ -23,7 +23,8 @@ Ogni sessione ha un nome stabile, un'etichetta GitHub `sessione:<nome>` e un log
 | Sessione | Etichetta | Dove gira | Si occupa di |
 |---|---|---|---|
 | Coordinamento | `sessione:cloud-coordinamento` | cloud (claude.ai/code) | codice, CI, issue, roadmap, coordinamento delle altre sessioni |
-| Validazione locale | `sessione:locale-windows` | PC Windows di Daniele (remote-control) | prove con accesso a vCenter/ESXi, Docker Desktop, verifiche sul campo |
+| Validazione locale | `sessione:locale-windows` | PC Windows di Daniele (remote-control) | prove con accesso a vCenter/ESXi, Docker Desktop, verifiche sul campo, `assets.local.md` |
+| ESXi Admin | `sessione:esxi-admin` | locale (laboratorio di Daniele) | gestione del laboratorio vSphere: accensione/configurazione di vCenter ed ESXi, Memory Tiering sugli host |
 
 Una nuova sessione si aggiunge qui (nome, etichetta, ruolo) prima di ricevere lavoro.
 

@@ -418,10 +418,15 @@ try {
 
 Write-Terminal "===========================================================" "Cyan"
 Write-Terminal "[*] Engine is LIVE and ready!" "Green"
-Write-Terminal "[*] Launching MTAT interface in your default web browser..." "Green"
-Write-Terminal "    (If it does not open automatically, browse to: $url)" "Yellow"
-Write-Terminal "===========================================================" "Cyan"
-Write-Terminal "Please leave this window open while using the tool. Press Ctrl+C to exit." "DarkGray"
+if ($global:Headless) {
+    Write-Terminal "[*] Headless mode: listening on port $targetPort (bind host '$bindHost'). Browse to the published port, e.g. http://localhost:$targetPort/" "Green"
+    Write-Terminal "===========================================================" "Cyan"
+} else {
+    Write-Terminal "[*] Launching MTAT interface in your default web browser..." "Green"
+    Write-Terminal "    (If it does not open automatically, browse to: $url)" "Yellow"
+    Write-Terminal "===========================================================" "Cyan"
+    Write-Terminal "Please leave this window open while using the tool. Press Ctrl+C to exit." "DarkGray"
+}
 
 # ==========================================
 # --- LITERAL FRONT-END INTERFACE (HTML5) --
@@ -3215,6 +3220,16 @@ while ($listener.IsListening) {
         $res = $context.Response
         $rawPath = $req.Url.LocalPath.ToLower().Trim('/')
 
+        # A body-carrying request with neither Content-Length nor chunked encoding (e.g. a bare
+        # `curl -X POST`) is answered with 411 by the managed HttpListener on Linux/macOS itself,
+        # which closes the response before handing us the context -- any write to $res would then
+        # throw ObjectDisposedException and get logged as a false [CRITICAL]. Browsers always send
+        # Content-Length (0 for an empty body), so this only affects ad-hoc clients.
+        if ($req.HttpMethod -notin @('GET', 'HEAD') -and -not $req.Headers['Content-Length'] -and $req.Headers['Transfer-Encoding'] -notmatch 'chunked') {
+            Write-DebugLog "[!] $($req.HttpMethod) /$rawPath without Content-Length -- answered 411 by the HTTP listener, ignored."
+            continue
+        }
+
         # Request guard. A 127.0.0.1 listener prefix only accepts requests whose Host header is
         # 127.0.0.1, but a wildcard prefix (MTAT_BIND_HOST=+, used in containers) accepts any Host --
         # which re-opens DNS rebinding: a malicious page whose domain re-resolves to 127.0.0.1 would
@@ -3773,6 +3788,12 @@ while ($listener.IsListening) {
         }
     } catch {
         $fatalText = Add-KnownIssueHints (Get-FullExceptionText $_)
+        if ($fatalText -match 'Cannot access a disposed object') {
+            # The response was already closed (client went away, or the listener answered on its
+            # own) -- nothing left to send, and not an engine failure.
+            Write-DebugLog "[!] Response for /$rawPath was already closed before the engine could answer (non-fatal): $fatalText"
+            continue
+        }
         Write-DebugLog "[CRITICAL] Outermost loop routing failure occurred: $fatalText"
         if ($null -ne $context -and $null -ne $context.Response) {
             Send-JsonResponse -Response $context.Response -Object @{ error = $fatalText }

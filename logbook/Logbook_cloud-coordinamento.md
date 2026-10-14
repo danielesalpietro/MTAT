@@ -3,6 +3,15 @@
 Sessione cloud (claude.ai/code) di coordinamento. Etichetta `sessione:cloud-coordinamento`.
 Regole in `CLAUDE.md`. Voce più recente in alto.
 
+## 2026-10-14 12:20: fix #9 (411 → falsi CRITICAL) e #21 (banner headless)
+- **Obiettivo**: chiudere i problemi emersi dalla validazione locale.
+- **Fatto**: richieste POST senza Content-Length (a cui HttpListener su Linux risponde da solo
+  411) ora sono registrate come WARN e non toccano la response; response già chiusa nel catch
+  esterno → WARN invece di CRITICAL. Banner di avvio specifico in headless. Sessione `esxi-admin`
+  registrata in `CLAUDE.md`.
+- **Verifiche**: container stub: POST senza CL → 411 con una riga WARN, 0 CRITICAL; CL:0
+  same-origin 200; chunked 200; guard Host/Origin invariato (403); desktop: banner originale.
+
 ## 2026-10-14 12:25: inventario sistemi (assets)
 - **Obiettivo**: un riferimento unico ai sistemi (vCenter, ESXi…), con utenti e percorso delle password.
 - **Fatto**: 53be209: `assets.md` versionato con solo formato e regole (fork pubblico);
