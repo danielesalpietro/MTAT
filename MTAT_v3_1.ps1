@@ -3626,10 +3626,21 @@ while ($listener.IsListening) {
                     # got silently overwritten by the Mem.TierNVMePct/100 fallback below.
                     $hostTierRatioReported = $false
                     if ($esxcliBudgetExceeded) {
-                        Write-DebugLog "[analyze] Skipping esxcli tiering-status query for host '$($h.Name)' -- per-host esxcli response time looked abnormal earlier this run; Tiering will show as 'Disabled' for this and any remaining host(s)."
+                        $hostIsTiered = "Unknown (not queried)"
+                        Write-DebugLog "[analyze] Skipping esxcli tiering-status query for host '$($h.Name)' -- per-host esxcli response time looked abnormal earlier this run; Tiering will show as 'Unknown (not queried)' for this and any remaining host(s)."
+                    } else {
+                    # Memory Tiering exists only on ESXi 8.0 Update 3 and later: on an older host "Disabled"
+                    # would wrongly suggest a feature that is available but switched off.
+                    $hostVersion = $null
+                    [void][version]::TryParse("$($h.Version)", [ref]$hostVersion)
+                    if ($null -ne $hostVersion -and $hostVersion -lt [version]"8.0.3") {
+                        $hostIsTiered = "Not supported (ESXi $($h.Version))"
                     } else {
                     try {
-                        $esxcli = Get-EsxCli -VMHost $h -V2 -ErrorAction SilentlyContinue
+                        # -ErrorAction Stop, not SilentlyContinue: a failed Get-EsxCli (missing privilege,
+                        # assembly load error) used to leave $esxcli empty and the host silently reported
+                        # as "Disabled". It now lands in the catch below as "Unknown (query failed)".
+                        $esxcli = Get-EsxCli -VMHost $h -V2 -ErrorAction Stop
                         if ($null -ne $esxcli.memtier) {
                             $status = $esxcli.memtier.status.get.Invoke()
                             if ($status.Status -match "Enabled") {
@@ -3641,8 +3652,12 @@ while ($listener.IsListening) {
                             if (($esxcli.system.settings.kernel.list.Invoke() | Where-Object { $_.Name -eq "MemoryTiering" }).Runtime -match "TRUE") {
                                 $hostIsTiered = "Enabled"
                             }
+                        } else {
+                            $hostIsTiered = "Unknown (no esxcli tiering namespace)"
+                            Write-DebugLog "[analyze] WARNING: host '$($h.Name)' (ESXi $($h.Version)) exposes neither 'memtier' nor 'system settings kernel' through esxcli -- Tiering shown as '$hostIsTiered'."
                         }
                     } catch {
+                        if ($hostIsTiered -ne "Enabled") { $hostIsTiered = "Unknown (query failed)" }
                         # $hostIsTiered may already be "Enabled" here if the failure happened AFTER
                         # that was set (e.g. casting $status.Ratio/$status.Percentage to [int] below
                         # it) -- log what will actually be shown, not an assumption that it's always
@@ -3658,6 +3673,7 @@ while ($listener.IsListening) {
                     if (-not $esxcliBudgetExceeded -and ($esxcliAvgLooksAbnormal -or $esxcliHitHardCeiling)) {
                         $esxcliBudgetExceeded = $true
                         Write-DebugLog "[analyze] WARNING: esxcli tiering-status queries are averaging $([math]::Round($esxcliAvgSecondsPerHost, 1))s/host across $esxcliCallCount host(s) so far (hard ceiling hit: $esxcliHitHardCeiling) -- this looks like genuinely abnormal esxcli behavior, not just a large cluster, so remaining host(s) this run will skip it and show 'Disabled' rather than wait indefinitely."
+                    }
                     }
                     }
 

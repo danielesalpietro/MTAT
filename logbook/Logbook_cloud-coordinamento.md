@@ -3,6 +3,17 @@
 Sessione cloud (claude.ai/code) di coordinamento. Etichetta `sessione:cloud-coordinamento`.
 Regole in `CLAUDE.md`. Voce più recente in alto.
 
+## 2026-10-14 19:15: #30 verificata sul PC; #29 stati di tiering espliciti
+- **Verifiche #30** (da `locale-windows`, 0a13902 su `vc-lab-01`): 5 moduli coerenti, ServiceModel
+  caricata, analisi Real-Time "2 VM trovate → 2 riportate", MoRef/VMHost valorizzati.
+- **#29**: premessa corretta da `locale-windows`: con Read-only di sistema `Get-EsxCli` funziona; il
+  fallimento silenzioso veniva da #30. Resta il difetto di `SilentlyContinue` → implementati stati
+  espliciti: "Not supported (ESXi x)" sotto 8.0.3 (nessuna query), "Unknown (query failed)" con WARN,
+  "Unknown (no esxcli tiering namespace)", "Unknown (not queried)" quando il budget esxcli è esaurito;
+  `Get-EsxCli -ErrorAction Stop`. La UI/sizing confronta solo con "Enabled": nuovi valori sicuri.
+- **Verifiche**: parse 0 errori; blocco estratto dal file ed eseguito con stub per 6 casi, tutti attesi.
+- **Aperto**: avviso UI unico per analisi (criterio #29) non ancora fatto; prova su host 8.0 U3.
+
 ## 2026-10-14 19:05: #30 CI verde
 - **Verifiche**: CI su 0a13902 verde (2 run). Log: 5 moduli della catena di Core tutti
   13.3.0.24145081 (Vim 8.3.0.24145081), `VMware.System.Private.ServiceModel 4.5.0.0` caricata,
