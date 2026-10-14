@@ -3800,6 +3800,7 @@ while ($listener.IsListening) {
                         HostName     = $currentHostName; Tiering = $hostIsTiered; TierRatioPct = $hostTierRatioPct; CPU_Pct = [math]::Round($hostCpuPct, 1)
                         Physical_RAM = $hostDramGB; Consumed_GB = $hostConsumedMemGB; Active_GB = $hostActiveGB; Active_Pct = if($hostDramGB -gt 0){[math]::Round(($hostActiveGB/$hostDramGB)*100,1)}else{0}
                     })
+                    Write-DebugLog "[analyze] Host '$currentHostName': Tiering='$hostIsTiered' (ratio $hostTierRatioPct%), DRAM $hostDramGB GB, consumed $hostConsumedMemGB GB, active $hostActiveGB GB, $(@($hostVMs).Count) powered-on VM(s)."
                   } catch {
                     $failedHostNames.Add($h.Name)
                     Write-DebugLog "[analyze] ERROR: host '$($h.Name)' failed entirely and was excluded from cluster totals (still listed below as 'ERROR'): $(Get-FullExceptionText $_)"
@@ -3828,8 +3829,10 @@ while ($listener.IsListening) {
                 }
 
                 Send-JsonResponse -Response $res -Object @{
-                    dram = $totalDramGB_Sum; consumed = [math]::Round($totalConsumedMemGB_Sum); active = [math]::Round($totalActiveGB)
-                    activeAvg = [math]::Round($totalActiveGB_Avg)
+                    # 2 decimals, like the per-host values: whole-GB rounding turned e.g. 0.1 GB active on a
+                    # small cluster into 0 and the cluster-level percentages into 0.0%.
+                    dram = $totalDramGB_Sum; consumed = [math]::Round($totalConsumedMemGB_Sum, 2); active = [math]::Round($totalActiveGB, 2)
+                    activeAvg = [math]::Round($totalActiveGB_Avg, 2)
                     cpu = if ($totalCpuMhz_Sum -gt 0) { [math]::Round(($totalCpuUsageMhz_Sum / $totalCpuMhz_Sum) * 100, 1) } else { 0 }
                     hosts = $hostResults; vms = @($vmResults | Sort-Object Active_Pct -Descending)
                     failedHosts = @($failedHostNames); failedVms = @($failedVmNames)

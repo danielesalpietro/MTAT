@@ -3,6 +3,15 @@
 Sessione cloud (claude.ai/code) di coordinamento. Etichetta `sessione:cloud-coordinamento`.
 Regole in `CLAUDE.md`. Voce più recente in alto.
 
+## 2026-10-14 19:30: #29 verificata sul PC; #32 arrotondamento totali di cluster
+- **Verifiche #29** (da `locale-windows`, ef9edab): host 8.0.2 → "Not supported (ESXi 8.0.2)";
+  "2 VM trovate → 2 riportate"; nessun WARN. Casi Unknown/Enabled non verificabili sul lab.
+- **Fatto**: aperta #32 e corretta: `api/analyze` arrotondava a GB interi consumed/active/activeAvg
+  di cluster (0,1 GB → 0 → 0,0% in checklist/matrice/export), ora 2 decimali come per host.
+  Riga INFO per host nel log (stato tiering, ratio, DRAM, consumed, active, n. VM), richiesta da
+  `locale-windows`.
+- **Verifiche**: parse 0 errori. Effetto reale da verificare sul PC (Active cluster 0,1%).
+
 ## 2026-10-14 19:15: #30 verificata sul PC; #29 stati di tiering espliciti
 - **Verifiche #30** (da `locale-windows`, 0a13902 su `vc-lab-01`): 5 moduli coerenti, ServiceModel
   caricata, analisi Real-Time "2 VM trovate → 2 riportate", MoRef/VMHost valorizzati.
