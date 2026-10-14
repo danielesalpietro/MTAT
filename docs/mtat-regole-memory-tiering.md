@@ -1,6 +1,6 @@
 # MTAT: come applica i requisiti del Memory Tiering
 
-**Stato**: bozza v0.4 (2026-10-14). Epic #36, sub-issue #37–#42.
+**Stato**: bozza v0.5 (2026-10-14). Epic #36, sub-issue #37–#42.
 **Requisiti di riferimento**: [`vsphere-memory-tiering-requisiti.md`](vsphere-memory-tiering-requisiti.md);
 analisi di fattibilità e ordine di lavoro: [`vsphere-memory-tiering-fattibilita.md`](vsphere-memory-tiering-fattibilita.md)
 (specifica dei requisiti vSphere 9.1, ID `SW-`, `NV-`, `HW-`, `FN-`, `CP-`, `MN-`, `SM-`, `DR-`, …).
@@ -71,6 +71,7 @@ Fonti: spec. §7.1 e §9.3; **KB 448305** (ufficiale, criteri di non idoneità p
 | M-VM-07 | Memoria "All locked" | reservation "Reserve all guest memory (All locked)" | KB 448305 | DRAM-only; **conflitto** con il blog (reservation tierabili): da verificare in lab |
 | M-VM-08 | Passthrough / DirectPath | dispositivi passthrough (già rilevati da MTAT) | blog (memoria pinned esclusa) | DRAM-only; manca una fonte ufficiale |
 | M-VM-09 | vGPU | profilo vGPU | nessuna fonte | trattata come M-VM-08 (prudenziale) finché non c'è una fonte |
+| M-VM-10 | > 60 vCPU su ESX 9.0.x | `NumCpu` della VM e versione dell'host | RN VCF 9.0, Known Issues "Memory Tiering Issues" | WARN in `Tiering_Notes`: può non accendersi con il tiering attivo; workaround `Mem.VMOverheadGrowthLimit = 3`. **Implementato** (#38) |
 
 Le VM DRAM-only entrano nel requisito **CP-01**: la loro memoria va coperta interamente da DRAM nel
 sizing (§2.4). Diagnostica post-attivazione: `memstats` (vmtier-stats), secondo la KB 448305.
@@ -139,6 +140,7 @@ sizing (§2.4). Diagnostica post-attivazione: `memstats` (vmtier-stats), secondo
 
 | Versione | Data | Modifiche |
 |---|---|---|
+| 0.5 | 2026-10-14 | M-VM-10 (> 60 vCPU su 9.0) implementato |
 | 0.4 | 2026-10-14 | GA 9.0 confermata (RN VCF 9.0), M-VER implementato (#37) |
 | 0.3 | 2026-10-14 | GA = 9.0 (decisione di Daniele); lab 9.x (#44), base dati BCG (#45), scheda Brownfield (#46) |
 | 0.2 | 2026-10-14 | Profili VM con le fonti di #42 (KB 448305, blog VCF), conflitto "All locked", regola HA prudenziale, link alla fattibilità |
