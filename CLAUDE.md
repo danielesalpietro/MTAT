@@ -9,6 +9,7 @@ sessione Claude (cloud o locale) che lavora sul repository.
 | Percorso | Contenuto |
 |---|---|
 | `MTAT_v3_1.ps1` | motore + UI (PowerShell, HTML/JS incorporati), file unico distribuibile |
+| `README.md`, `README_IT.md` | presentazione del progetto in inglese e in italiano: da aggiornare insieme quando cambiano funzioni, comandi o requisiti |
 | `MTAT_v3_1.exe` | build ps2exe upstream (non rigenerata da noi, vedi #3) |
 | `docker/`, `docker-compose.yml` | deploy container headless (`docker/README.md`) |
 | `twin/`, `docker-compose.twin.yml` | gemello digitale di vCenter/ESXi per test end-to-end senza lab (`twin/README.md`, #47) |
