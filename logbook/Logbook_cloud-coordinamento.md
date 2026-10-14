@@ -3,6 +3,16 @@
 Sessione cloud (claude.ai/code) di coordinamento. Etichetta `sessione:cloud-coordinamento`.
 Regole in `CLAUDE.md`. Voce più recente in alto.
 
+## 2026-10-14 13:20: #25 rivisto: import offline raggiungibile anche senza cluster
+- **Obiettivo**: effetto collaterale segnalato da `locale-windows`: con 0 cluster il `return` di
+  72ef773 lasciava bloccate le schede e quindi anche l'Import offline.
+- **Fatto**: con 0 cluster le schede si sbloccano; menu cluster (Baseline e Simulator) e Analyze
+  disabilitati con voce "(no clusters found)"; l'avviso indica che l'import Matrix/History resta
+  disponibile. L'import singolo MTAT/RVTools richiede già oggi un cluster live selezionato:
+  limite preesistente, coperto da #26 (import senza vCenter).
+- **Verifiche**: Playwright su container stub: 0 cluster → avviso, select/Analyze disabilitati,
+  schede visibili, pannello Import apribile, tab Simulator senza errori; 2 cluster → invariato.
+
 ## 2026-10-14 13:05: #15 primo contatto con vc-lab-01; fix #25 (nessun cluster)
 - **Obiettivo**: gestire l'esito della prima connessione reale (riportato da `locale-windows`).
 - **Fatto**: login su `vc-lab-01` riuscito ma il lab non ha cluster → aperta #25 e corretta:

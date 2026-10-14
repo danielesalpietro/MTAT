@@ -1552,11 +1552,17 @@ $htmlContent = @'
                         var simSelect = document.getElementById('simClusterSelect'); simSelect.innerHTML = "";
                         var cList = data.clusters || []; if (!Array.isArray(cList)) cList = [cList];
                         // Login can succeed against a vCenter that has no cluster objects at all (e.g. a
-                        // lab with only standalone hosts) -- say so explicitly instead of unlocking the
-                        // analysis tabs with an empty, unexplained Target Cluster menu.
-                        if (cList.length === 0) {
-                            showToast("Connected, but no vSphere clusters were found on the connected vCenter(s).\n\nMTAT analyzes clusters only: standalone ESXi hosts that are not members of a cluster are not listed. Add the hosts to a cluster and connect again.", 'warn');
-                            return;
+                        // lab with only standalone hosts) -- say so explicitly instead of showing an
+                        // empty, unexplained Target Cluster menu. The tabs are still unlocked so the
+                        // offline import (Matrix CSV / History Bundle) stays reachable; only the live
+                        // cluster controls are disabled.
+                        var noClusters = (cList.length === 0);
+                        cSelect.disabled = noClusters; simSelect.disabled = noClusters;
+                        document.getElementById('analyzeBtn').disabled = noClusters;
+                        if (noClusters) {
+                            var emptyOpt = "<option value=''>(no clusters found)</option>";
+                            cSelect.innerHTML = emptyOpt; simSelect.innerHTML = emptyOpt;
+                            showToast("Connected, but no vSphere clusters were found on the connected vCenter(s).\n\nMTAT analyzes clusters only: standalone ESXi hosts that are not members of a cluster are not listed. Add the hosts to a cluster and connect again.\n\nOffline import (Matrix CSV / History Bundle) is still available in the Baseline tab.", 'warn');
                         }
                         for (var i = 0; i < cList.length; i++) {
                             var optHtml = "<option value='" + escapeHtml(cList[i].Value) + "'>" + escapeHtml(cList[i].Text) + "</option>";
