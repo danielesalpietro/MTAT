@@ -1,7 +1,8 @@
 # MTAT: come applica i requisiti del Memory Tiering
 
-**Stato**: bozza v0.1 (2026-10-14). Epic #36, sub-issue #37–#42.
-**Requisiti di riferimento**: [`vsphere-memory-tiering-requisiti.md`](vsphere-memory-tiering-requisiti.md)
+**Stato**: bozza v0.2 (2026-10-14). Epic #36, sub-issue #37–#42.
+**Requisiti di riferimento**: [`vsphere-memory-tiering-requisiti.md`](vsphere-memory-tiering-requisiti.md);
+analisi di fattibilità e ordine di lavoro: [`vsphere-memory-tiering-fattibilita.md`](vsphere-memory-tiering-fattibilita.md)
 (specifica dei requisiti vSphere 9.1, ID `SW-`, `NV-`, `HW-`, `FN-`, `CP-`, `MN-`, `SM-`, `DR-`, …).
 
 Questo documento non ripete i requisiti: per ciascuno dice **cosa fa MTAT**, cioè se lo verifica, lo
@@ -30,7 +31,9 @@ fallita, mai assimilato a PASS o FAIL).
 | M-VER-02 | SW-01 (vCenter) | AUTO per vCenter | stessa logica |
 
 **Decisione di Daniele (2026-10-14)**: la specifica indica 9.1+, ma per gli assessment MTAT usa tre
-livelli.
+livelli. Fonti raccolte in #42: 8.0 U3 = tech preview (release notes 8.0.3, KB 95944); produzione da
+9.0 secondo fonti secondarie (release notes VCF 9.0 da leggere); la doc 9.1 indica 9.1+.
+*In discussione*: `vsphere-memory-tiering-fattibilita.md` §2 propone la soglia unica 9.1.
 
 | Versione | Stato mostrato | Esito |
 |---|---|---|
@@ -52,21 +55,26 @@ il livello "< 8.0 U3" (#29).
 
 ### 2.3 Profili VM esclusi dal tiering (#38, #42)
 
-Requisiti: spec. §7.1 (Low Latency, Confidential, Fault Tolerant, Large, Nested) e §9.3 (esclusione
-per VM).
+Fonti: spec. §7.1 e §9.3; **KB 448305** (ufficiale, criteri di non idoneità per VM); blog VCF del
+2026-08-06 (fonte secondaria). Dettaglio e link nel commento di `locale-windows` su #42.
 
-| ID MTAT | Profilo | Come rilevarlo (da verificare) | Effetto in MTAT |
-|---|---|---|---|
-| M-VM-01 | Low Latency | Latency Sensitivity = High | DRAM-only |
-| M-VM-02 | Confidential | SEV / SGX / TDX attivi | DRAM-only |
-| M-VM-03 | Fault Tolerant | FT configurata | DRAM-only |
-| M-VM-04 | Large | > 512 GB **e** 64 vCPU | DRAM-only + nota (tiering off e reservation completa) |
-| M-VM-05 | Nested | hardware virtualization esposta (eccezione VBS: `sched.mem.enableNestedTiering`) | DRAM-only salvo eccezione |
-| M-VM-06 | Esclusa esplicitamente | `sched.mem.enableTiering = FALSE` (già letto da MTAT) | DRAM-only |
-| M-VM-07 | Passthrough / vGPU | dispositivi passthrough (già rilevati da MTAT) | DRAM-only; **fonte da trovare** (#42) |
+| ID MTAT | Profilo | Come rilevarlo | Fonte | Effetto in MTAT |
+|---|---|---|---|---|
+| M-VM-01 | Low Latency | Latency Sensitivity = High | spec. §7.1, KB 448305 | DRAM-only |
+| M-VM-02 | Confidential | SEV / SGX / TDX attivi | spec. §7.1 | DRAM-only |
+| M-VM-03 | Fault Tolerant | FT configurata | spec. §7.1, blog | DRAM-only |
+| M-VM-04 | Large | > 512 GB **e** 64 vCPU | spec. §7.1 | DRAM-only + nota (tiering off e reservation completa) |
+| M-VM-05 | Nested | `vhv.enable = TRUE` (eccezione VBS: `sched.mem.enableNestedTiering`) | spec. §7.1, KB 448305 | DRAM-only salvo eccezione |
+| M-VM-06 | Esclusa esplicitamente | `sched.mem.enableTiering = FALSE` (già letto da MTAT) | spec. §9.3, KB 448305 | DRAM-only |
+| M-VM-07 | Memoria "All locked" | reservation "Reserve all guest memory (All locked)" | KB 448305 | DRAM-only; **conflitto** con il blog (reservation tierabili): da verificare in lab |
+| M-VM-08 | Passthrough / DirectPath | dispositivi passthrough (già rilevati da MTAT) | blog (memoria pinned esclusa) | DRAM-only; manca una fonte ufficiale |
+| M-VM-09 | vGPU | profilo vGPU | nessuna fonte | trattata come M-VM-08 (prudenziale) finché non c'è una fonte |
 
 Le VM DRAM-only entrano nel requisito **CP-01**: la loro memoria va coperta interamente da DRAM nel
-sizing (§2.4).
+sizing (§2.4). Diagnostica post-attivazione: `memstats` (vmtier-stats), secondo la KB 448305.
+
+**HA admission control**: nessuna fonte ufficiale. Regola prudenziale proposta: la capacità NVMe
+**non** conta come margine di failover (#42).
 
 ### 2.4 Sizing (#39)
 
@@ -119,7 +127,8 @@ sizing (§2.4).
 1. Versione GA del Memory Tiering (M-VER) → #42.
 2. Rilevamento in sola lettura di PMem/NVDIMM, uso degli NVMe, Quick Boot, profili VM (M-HW, M-VM).
 3. Stima della memoria kernel (M-SZ-03): valore fisso, percentuale o dato rilevato.
-4. Fonte per passthrough/vGPU (M-VM-07) e HA admission control → #42.
+4. Fonte ufficiale per passthrough/vGPU (M-VM-08/09), conflitto "All locked" (M-VM-07), HA admission
+   control → #42 e verifica in lab.
 5. Punti [DA VERIFICARE] della specifica dei requisiti (§12), in particolare il 6 (50% "must" contro
    "should") e il 7 (soglia 80%).
 6. Forma dell'avviso di prerequisito nel Brownfield (#34).
@@ -128,4 +137,5 @@ sizing (§2.4).
 
 | Versione | Data | Modifiche |
 |---|---|---|
+| 0.2 | 2026-10-14 | Profili VM con le fonti di #42 (KB 448305, blog VCF), conflitto "All locked", regola HA prudenziale, link alla fattibilità |
 | 0.1 | 2026-10-14 | Prima stesura: mappatura dei requisiti della specifica 9.1 e delle pagine web A/B/C (#36) sulle regole MTAT; decisione sulle versioni di Daniele |

@@ -15,6 +15,7 @@ sessione Claude (cloud o locale) che lavora sul repository.
 | `docs/ROADMAP.md` | fasi di evoluzione della piattaforma |
 | `docs/vsphere-memory-tiering-requisiti.md` | requisiti del Memory Tiering (vSphere 9.1), con ID `SW-`/`NV-`/`CP-`… |
 | `docs/mtat-regole-memory-tiering.md` | come MTAT applica quei requisiti (regole `M-…`, esiti, issue) |
+| `docs/vsphere-memory-tiering-fattibilita.md` | fattibilità, mappa issue, Brownfield/Greenfield, ordine di lavoro |
 | `logbook/Logbook_<sessione>.md` | diario di lavoro, uno per sessione |
 | `assets.md` | formato e regole dell'inventario dei sistemi; i dati reali sono in `assets.local.md` (non versionato) |
 
