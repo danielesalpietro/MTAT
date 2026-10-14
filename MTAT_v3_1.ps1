@@ -9,8 +9,24 @@ try {
     $global:HasConsole = $true
 } catch { }
 
+# --- HEADLESS / CONTAINER MODE ---------------------------------------------
+# Opt-in via environment variables (all unset = original desktop behavior, unchanged):
+#   MTAT_HEADLESS=1   no browser launch, no UI-heartbeat self-termination, log to stdout even
+#                     without an interactive console (so `docker logs` shows the engine output)
+#   MTAT_PORT=8600    fixed listen port instead of auto-discovery (a container needs a known port)
+#   MTAT_BIND_HOST=+  HttpListener host part; "+" listens on all interfaces (needed inside a
+#                     container so the published port is reachable). Default stays 127.0.0.1.
+#   MTAT_DATA_DIR     where the debug log / loading page are written (default: system temp dir)
+# The engine has NO authentication of its own: anyone who can reach the port can drive the
+# vCenter sessions it holds. Only expose it beyond localhost behind a trusted network/proxy.
+$global:Headless = ($env:MTAT_HEADLESS -in @('1', 'true', 'yes'))
+$bindHost = if ($env:MTAT_BIND_HOST) { $env:MTAT_BIND_HOST } else { "127.0.0.1" }
+
 function Write-Terminal($Message, $Color="White") {
-    if ($global:HasConsole -and ($Host.Name -notmatch "PS2EXE")) {
+    if ($global:Headless) {
+        Write-Host $Message
+    }
+    elseif ($global:HasConsole -and ($Host.Name -notmatch "PS2EXE")) {
         Write-Host $Message -ForegroundColor $Color
     }
 }
@@ -23,6 +39,11 @@ Write-Terminal "[*] Initializing core components... Please wait." "Yellow"
 
 $targetPort = 8600
 $portFound = $false
+$fixedPort = $false
+if ($env:MTAT_PORT) {
+    $targetPort = [int]$env:MTAT_PORT
+    $fixedPort = $true
+}
 
 while (-not $portFound) {
     if ($targetPort -gt 65500) {
@@ -35,6 +56,10 @@ while (-not $portFound) {
         $listenerTest.Stop()
         $portFound = $true
     } catch {
+        if ($fixedPort) {
+            Write-Terminal "FATAL: MTAT_PORT=$targetPort is already in use. Exiting." "Red"
+            exit 1
+        }
         Write-Terminal "[!] Port $targetPort is occupied. Trying next port..." "Yellow"
         $targetPort++
     }
@@ -43,7 +68,7 @@ while (-not $portFound) {
 # ==========================================
 # --- INSTANT LOADING SCREEN GENERATION ----
 # ==========================================
-$TempDir = [System.IO.Path]::GetTempPath()
+$TempDir = if ($env:MTAT_DATA_DIR) { $env:MTAT_DATA_DIR } else { [System.IO.Path]::GetTempPath() }
 $LoadingHtmlPath = Join-Path $TempDir "MTAT_Loading.html"
 $LogFilePath = Join-Path $TempDir "MTAT_debug_log.txt"
 
@@ -130,7 +155,10 @@ $loadingHtmlContent = @"
 $loadingHtmlContent | Out-File -FilePath $LoadingHtmlPath -Force -Encoding UTF8
 
 try {
-    if ($PSVersionTable.PSEdition -eq 'Core') {
+    if ($global:Headless) {
+        # No desktop/browser inside a container -- the user browses to the published port instead.
+    }
+    elseif ($PSVersionTable.PSEdition -eq 'Core') {
         if ($IsMacOS) { [void](Start-Process "open" -ArgumentList $LoadingHtmlPath -PassThru) }
         elseif ($IsLinux) { [void](Start-Process "xdg-open" -ArgumentList $LoadingHtmlPath -PassThru) }
         else { [void](Start-Process $LoadingHtmlPath -PassThru) }
@@ -370,14 +398,14 @@ function Update-VersionCheckJobStatus {
 
 $url = "http://127.0.0.1:$targetPort/"
 $listener = New-Object System.Net.HttpListener
-$listener.Prefixes.Add($url)
+$listener.Prefixes.Add("http://$($bindHost):$targetPort/")
 
 try {
     $listener.Start()
     Write-DebugLog "[+] HTTP daemon bound to network port $targetPort successfully."
 } catch {
     Write-DebugLog "[-] CRITICAL: Port $targetPort bind failed. $(Get-FullExceptionText $_)"
-    exit
+    exit 1
 }
 
 Write-Terminal "===========================================================" "Cyan"
@@ -3144,6 +3172,10 @@ while ($listener.IsListening) {
             Start-Sleep -Milliseconds 200
             Update-VersionCheckJobStatus
             $secondsSincePulse = ((Get-Date) - $lastHeartbeat).TotalSeconds
+
+            # In headless/container mode the engine is a long-running service shared by whoever
+            # browses to it, so a closed browser tab must not take it down.
+            if ($global:Headless) { continue }
 
             # Dead-Man's Switch: If UI is connected but drops pulse for 5 minutes (300s), exit cleanly
             if ($uiConnected -and $secondsSincePulse -gt 300) {
