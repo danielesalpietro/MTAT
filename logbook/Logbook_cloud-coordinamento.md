@@ -3,6 +3,11 @@
 Sessione cloud (claude.ai/code) di coordinamento. Etichetta `sessione:cloud-coordinamento`.
 Regole in `CLAUDE.md`. Voce più recente in alto.
 
+## 2026-10-14 14:05: PR verso main del fork
+- **Fatto**: aperta danielesalpietro/MTAT#27 (`claude/focused-hamilton-m4loti` → `main`, fork di
+  Daniele, non upstream). Chiude #9, #21, #23, #25 al merge; #1 resta aperta (Sec-Fetch-Site).
+- **Aperto**: review e merge di Daniele.
+
 ## 2026-10-14 14:00: #25 verificata sul PC (94cd510)
 - **Verifiche** (da `locale-windows`, hash dello script nel container = checkout): password errata →
   UI resta in Fase 1 con errore; account RO → "0 cluster(s) found", "(no clusters found)",
