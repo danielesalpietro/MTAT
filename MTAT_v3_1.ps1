@@ -1033,7 +1033,7 @@ $htmlContent = @'
             </div>
             <div class="input-group" id="wrapperSimCustom" style="display:none;">
                 <label for="customPct">Custom NVMe % (vs DRAM)</label>
-                <input type="number" id="customPct" value="150" min="0" step="10" oninput="runSimulationMath()" style="padding:7px; font-weight:bold; border-radius:4px; border:1px solid var(--border-input); height:41px;">
+                <input type="number" id="customPct" value="150" min="1" max="400" step="10" oninput="runSimulationMath()" style="padding:7px; font-weight:bold; border-radius:4px; border:1px solid var(--border-input); height:41px;">
             </div>
         </div>
 
@@ -1110,7 +1110,7 @@ $htmlContent = @'
             </div>
         </div>
 
-        <div id="shared-costs" class="form-panel" style="display: grid; grid-template-columns: 1.5fr 1.5fr 2fr; gap: 20px; margin-bottom: 25px; padding: 15px 25px; align-items: flex-end;">
+        <div id="shared-costs" class="form-panel" style="display: grid; grid-template-columns: 1.5fr 1.5fr 1.5fr 2fr; gap: 20px; margin-bottom: 25px; padding: 15px 25px; align-items: flex-end;">
             <div class="input-group">
                 <label for="costDram">DRAM Quote Price ($ per GB)</label>
                 <input type="number" id="costDram" value="100.00" min="0" step="1.00" oninput="runSimulationMath()">
@@ -1118,6 +1118,10 @@ $htmlContent = @'
             <div class="input-group">
                 <label for="costNvme">NVMe SSD Price ($ per GB)</label>
                 <input type="number" id="costNvme" value="0.25" min="0" step="0.05" oninput="runSimulationMath()">
+            </div>
+            <div class="input-group">
+                <label for="sysMemPerHost" title="Memory ESXi keeps for itself on each host. It is never tiered to NVMe (only VM memory is), so it is subtracted from the DRAM that has to hold the Active Memory. 0 keeps the previous sizing; the default estimate is still to be agreed (#39).">ESXi System Memory (GB per host)</label>
+                <input type="number" id="sysMemPerHost" value="0" min="0" step="1" oninput="runSimulationMath()">
             </div>
             <div class="input-group" style="height:41px; justify-content:center;">
                 <div class="checkbox-row" style="margin:0;">
@@ -2121,6 +2125,40 @@ $htmlContent = @'
         return lines;
     }
 
+    // Sizing rules of #39 (M-SZ in docs/mtat-regole-memory-tiering.md). DRAM that has to hold the
+    // Active Memory is what is left after the ESXi system memory (never tiered, M-SZ-03), and must
+    // also hold the VMs that stay entirely in DRAM (M-SZ-04); the 50% factor is the M-WL-01 limit.
+    // With no system memory and no DRAM-only VMs both reduce to the previous formulas.
+    function hostsForDramFloor(o) {
+        var vmDram = o.dramPerHostGB - (o.sysMemGB || 0);
+        if (!(vmDram > 0)) return Infinity;
+        return Math.ceil((o.activeGB / 0.50 + (o.dramOnlyGB || 0)) / vmDram);
+    }
+
+    function dramPerHostFloorGB(o) {
+        return Math.ceil(Math.ceil(o.activeGB / o.hosts) / 0.50 + (o.dramOnlyGB || 0) / o.hosts + (o.sysMemGB || 0));
+    }
+
+    // Memory of the VMs that cannot be tiered (pinned or excluded), from the per-VM DRAM_Fit (#38).
+    function dramOnlyVmGB(vms) {
+        return (vms || []).reduce(function(sum, v) {
+            return sum + (v.DRAM_Fit === "DRAM-only" ? (parseFloat(v.Provisioned_GB) || 0) : 0);
+        }, 0);
+    }
+
+    // Advisories shared by Brownfield and Greenfield: NVMe smaller than DRAM (M-SZ-02) and no NVMe
+    // redundancy (M-SZ-06).
+    function nvmeSizingAdvisories(o) {
+        var out = [];
+        if (o.nvmeDeviceGB > 0 && o.nvmeDeviceGB < o.dramPerHostGB) {
+            out.push("The NVMe device (" + o.nvmeDeviceGB + " GB per host) is smaller than the host DRAM (" + o.dramPerHostGB + " GB): the tier is limited to the NVMe capacity. An NVMe at least as large as DRAM is recommended (M-SZ-02).");
+        }
+        if (!o.mirroring) {
+            out.push("No NVMe redundancy: a single device failure affects every VM with pages on it. Hardware RAID or NVMe Software Mirroring is recommended, with the mirror at least as large as the first device (M-SZ-06).");
+        }
+        return out;
+    }
+
     function runSimulationMath() {
         var strategy = document.getElementById('simStrategy') ? document.getElementById('simStrategy').value : 'brownfield';
         var hostCount = cachedHosts.length || 1;
@@ -2185,6 +2223,8 @@ $htmlContent = @'
             // explanation rather than sharing one hardcoded message that's only true for one of them.
             var partitionExceededMsg = "";
             var currentTotalCpu = globalCpu * hostCount;
+            var sysMemGB = Math.max(0, parseFloat(document.getElementById('sysMemPerHost').value) || 0);
+            var dramOnlyGB = dramOnlyVmGB(cachedVms);
 
             if (gfMode === 'capacity') {
                 var selVal = document.getElementById('gfNodeCapSelect').value;
@@ -2239,12 +2279,17 @@ $htmlContent = @'
                 // whatever's needed so the cluster's Active Memory never exceeds half of the
                 // deployed DRAM capacity, leaving headroom since Memory Tiering performance degrades
                 // as the hot/active working set approaches the full size of the fast tier.
-                var reqActive = Math.ceil(globalActive / (gfDram * 0.50));
+                // M-SZ-03/04: system memory and DRAM-only VMs also have to fit in that DRAM.
+                var reqActive = hostsForDramFloor({ activeGB: globalActive, dramOnlyGB: dramOnlyGB, dramPerHostGB: gfDram, sysMemGB: sysMemGB });
+                if (!isFinite(reqActive)) {
+                    reqActive = 1;
+                    limitingFactorMsg = "[!] Warning: the ESXi system memory is as large as the DRAM per host, so there is no DRAM left for VMs at this ratio.<br><br>";
+                }
                 var tieredBase = Math.max(reqConsumedTiered, reqCpu, reqActive);
                 if (tieredBase < 1) tieredBase = 1;
                 tieredReqHosts = tieredBase + haNodes;
 
-                limitingFactorMsg = describeTieredSizing({
+                limitingFactorMsg += describeTieredSizing({
                     reqConsumed: reqConsumedTiered, reqCpu: reqCpu, reqActive: reqActive,
                     workloadHosts: tieredBase, haNodes: haNodes,
                     consumedGB: globalConsumed, activeGB: globalActive
@@ -2277,8 +2322,7 @@ $htmlContent = @'
                 // 0.50: same Active Memory safety limit as the capacity-mode branch -- here solved
                 // for the minimum DRAM needed (given a fixed host count) so Active Memory never
                 // exceeds half of it, instead of for host count (given a fixed DRAM size).
-                var reqActive = Math.ceil(globalActive / usableHosts);
-                var minDramForActive = Math.ceil(reqActive / 0.50);
+                var minDramForActive = dramPerHostFloorGB({ activeGB: globalActive, dramOnlyGB: dramOnlyGB, hosts: usableHosts, sysMemGB: sysMemGB });
                 var dramForCons = Math.ceil(reqConsumed / (1 + gfRatioVal));
                 
                 gfDram = Math.max(minDramForActive, dramForCons);
@@ -2319,7 +2363,8 @@ $htmlContent = @'
             var netSavings = totalStandardCost - totalTieredCost;
             var totalTieredMemDeployed = tieredReqHosts * (gfDram + gfNvme);
             var totalUsed = totalTieredMemDeployed > 0 ? ((globalConsumed / totalTieredMemDeployed) * 100).toFixed(2) : 0;
-            var projectedActivePct = (tieredReqHosts * gfDram) > 0 ? ((globalActive / (tieredReqHosts * gfDram)) * 100).toFixed(1) : 0;
+            var gfVmDram = tieredReqHosts * Math.max(0, gfDram - sysMemGB);
+            var projectedActivePct = gfVmDram > 0 ? ((globalActive / gfVmDram) * 100).toFixed(1) : 0;
 
             if (clusterIsAlreadyTiered) {
                 activeTierAlertDiv.innerText = "[ i ] Environment Context: Memory Tiering is already active on this cluster (currently configured at " + existingRatioPct + "% ratio). Formulas below outline incremental capacity shifts vs the active baseline.";
@@ -2365,6 +2410,16 @@ $htmlContent = @'
                 if(msg === "") ceilingWarningCard.className = "info-panel-box";
                 msg += (msg ? "<br><br>" : "") + "[ i ] INFO: " + partitionExceededMsg;
             }
+            var gfAdvisories = nvmeSizingAdvisories({ nvmeDeviceGB: gfNvme, dramPerHostGB: gfDram, mirroring: mirroringActive });
+            // Tiering costs some CPU (about 1/8 of a core on small hosts): not modelled, stated so
+            // the CPU headroom is read with it in mind.
+            gfAdvisories.push("Memory Tiering uses some host CPU (about 1/8 of a core on small hosts); it is not included in the CPU sizing.");
+            if (sysMemGB > 0 || dramOnlyGB > 0) {
+                gfAdvisories.push("DRAM sizing keeps " + sysMemGB + " GB per host for ESXi and " + Math.round(dramOnlyGB) + " GB for VMs that stay entirely in DRAM (M-SZ-03, M-SZ-04).");
+            }
+            ceilingWarningCard.style.display = 'block';
+            if (msg === "") ceilingWarningCard.className = "info-panel-box";
+            msg += (msg ? "<br><br>" : "") + gfAdvisories.map(function(a) { return "[ i ] INFO: " + escapeHtml(a); }).join("<br>");
             if (msg !== "") ceilingWarningCard.innerHTML = msg;
 
             var simActiveBadge = document.getElementById('gfActiveBadge');
@@ -2387,6 +2442,7 @@ $htmlContent = @'
             var nvmePerHostUsable = 0;
             var effectiveMultiplier = 1;
             var ratioExceeded = false;
+            var ratioBelowMin = false;
             var partitionExceeded = false;
 
             var driveSizeGBSelected = 0;
@@ -2407,6 +2463,8 @@ $htmlContent = @'
                 driveSizeGBSelected = nvmePerHostUsable;
             } else if (mode === 'custom') {
                 var inputPct = parseFloat(document.getElementById('customPct').value) || 0;
+                // M-SZ-07: tier size is 1-400% of DRAM; the upper bound is handled below.
+                if (inputPct < 1) { inputPct = 1; ratioBelowMin = true; }
                 effectiveMultiplier = inputPct / 100;
                 nvmePerHostUsable = Math.round(avgDramPerHost * effectiveMultiplier);
                 
@@ -2438,6 +2496,13 @@ $htmlContent = @'
                     nvmePerHostUsable = Math.round(avgDramPerHost * 4);
                     ratioExceeded = true;
                 }
+            }
+
+            // M-SZ-03: ESXi system memory is never tiered, so Active Memory has to fit in what is left.
+            var bfSysMemGB = Math.max(0, parseFloat(document.getElementById('sysMemPerHost').value) || 0);
+            if (bfSysMemGB > 0) {
+                var bfVmDram = globalDram - bfSysMemGB * hostCount;
+                activePct = bfVmDram > 0 ? ((globalActive / bfVmDram) * 100).toFixed(1) : 100;
             }
 
             var totalNvmeClusterSizeUsable = nvmePerHostUsable * hostCount;
@@ -2528,11 +2593,16 @@ $htmlContent = @'
                 ? "The recommended ratio for Memory Tiering is 1:1 (Default). Ratios above 1:1 require additional workload assessment, since Active Memory needs to be proportionally lower to reliably fit within the DRAM tier."
                 : "";
 
-            if (ratioAdvisoryMsg || partitionExceeded || ratioExceeded) {
+            var bfAdvisories = nvmeSizingAdvisories({ nvmeDeviceGB: driveSizeGBSelected, dramPerHostGB: avgDramPerHost, mirroring: mirroringActive });
+            if (ratioBelowMin) bfAdvisories.unshift("The NVMe tier size must be between 1% and 400% of DRAM; the custom value was raised to 1% (M-SZ-07).");
+            if (bfSysMemGB > 0) bfAdvisories.push("Active Memory is compared with the DRAM left after " + bfSysMemGB + " GB per host of ESXi system memory (M-SZ-03).");
+
+            if (ratioAdvisoryMsg || partitionExceeded || ratioExceeded || bfAdvisories.length > 0) {
                 ceilingWarningCard.style.display = 'block';
                 ceilingWarningCard.className = 'info-panel-box';
                 var msg = "";
                 if (ratioAdvisoryMsg) { msg += "[ i ] INFO: " + ratioAdvisoryMsg; }
+                if (bfAdvisories.length > 0) { msg += (msg ? "<br><br>" : "") + bfAdvisories.map(function(a) { return "[ i ] INFO: " + escapeHtml(a); }).join("<br>"); }
                 if (partitionExceeded || ratioExceeded) {
                     var capMsg = "The highest supported memory tiering configuration is a 1:4 ratio. ";
                     if (partitionExceeded && ratioExceeded) {

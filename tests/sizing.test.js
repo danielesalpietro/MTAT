@@ -33,4 +33,19 @@ assert(lines.length === 3 && /M-WL-01/.test(lines[0]) && /M-WL-03/.test(lines[1]
 assert.deepStrictEqual(describeActiveRisks(collectActiveRisks([], [])), []);
 const many = describeActiveRisks({ hostPeak: [], hostDemand: [], vms: Array.from({ length: 10 }, (_, i) => 'vm' + i) });
 assert(/and 2 more/.test(many[0]) && !/vm9/.test(many[0]));
+// NVMe sizing rules (#39, M-SZ-02/03/04/06).
+// Without system memory or DRAM-only VMs the floors match the previous formulas.
+assert.strictEqual(hostsForDramFloor({ activeGB: 300, dramPerHostGB: 256 }), Math.ceil(300 / (256 * 0.5)));
+assert.strictEqual(dramPerHostFloorGB({ activeGB: 301, hosts: 3 }), Math.ceil(Math.ceil(301 / 3) / 0.5));
+// System memory leaves less DRAM for VMs; DRAM-only VMs need their full memory.
+assert.strictEqual(hostsForDramFloor({ activeGB: 300, dramPerHostGB: 256, sysMemGB: 56 }), 3);
+assert.strictEqual(hostsForDramFloor({ activeGB: 300, dramOnlyGB: 200, dramPerHostGB: 256, sysMemGB: 56 }), 4);
+assert.strictEqual(hostsForDramFloor({ activeGB: 10, dramPerHostGB: 16, sysMemGB: 16 }), Infinity);
+assert.strictEqual(dramPerHostFloorGB({ activeGB: 300, dramOnlyGB: 64, hosts: 2, sysMemGB: 8 }), 300 + 32 + 8);
+assert.strictEqual(dramOnlyVmGB([{ DRAM_Fit: 'DRAM-only', Provisioned_GB: 64 }, { DRAM_Fit: 'PASS', Provisioned_GB: 128 }, { DRAM_Fit: 'DRAM-only', Provisioned_GB: '32' }]), 96);
+assert.strictEqual(dramOnlyVmGB(undefined), 0);
+const adv = nvmeSizingAdvisories({ nvmeDeviceGB: 256, dramPerHostGB: 512, mirroring: false });
+console.log('nvme  :', adv.join(' | '));
+assert(adv.length === 2 && /M-SZ-02/.test(adv[0]) && /M-SZ-06/.test(adv[1]));
+assert.deepStrictEqual(nvmeSizingAdvisories({ nvmeDeviceGB: 512, dramPerHostGB: 512, mirroring: true }), []);
 console.log('ALL OK');

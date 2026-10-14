@@ -1,6 +1,6 @@
 # MTAT: come applica i requisiti del Memory Tiering
 
-**Stato**: bozza v0.6 (2026-10-14). Epic #36, sub-issue #37–#42.
+**Stato**: bozza v0.7 (2026-10-14). Epic #36, sub-issue #37–#42.
 **Requisiti di riferimento**: [`vsphere-memory-tiering-requisiti.md`](vsphere-memory-tiering-requisiti.md);
 analisi di fattibilità e ordine di lavoro: [`vsphere-memory-tiering-fattibilita.md`](vsphere-memory-tiering-fattibilita.md)
 (specifica dei requisiti vSphere 9.1, ID `SW-`, `NV-`, `HW-`, `FN-`, `CP-`, `MN-`, `SM-`, `DR-`, …).
@@ -104,6 +104,21 @@ sizing (§2.4). Diagnostica post-attivazione: `memstats` (vmtier-stats), secondo
 | M-SZ-06 | SM-01…03 | CALC + WARN | mirroring raccomandato (opzione già presente); il mirror deve essere ≥ del primo device |
 | M-SZ-07 | tier_size_pct 1–400 (spec. §8.5) | CALC | range valido dei ratio personalizzati nel simulatore |
 
+**Implementato (#39)** nel simulatore (Sizing & Savings):
+
+| ID | Effetto |
+|---|---|
+| M-SZ-02 | avviso quando l'NVMe per host è più piccolo della DRAM (Brownfield; in Greenfield l'NVMe è almeno pari alla DRAM per costruzione) |
+| M-SZ-03 | nuovo campo "ESXi System Memory (GB per host)": sottratto dalla DRAM che deve contenere l'active. Greenfield: host e DRAM minima; Brownfield: active % del simulatore. **Default 0** (sizing invariato) finché non c'è una stima con fonte o un dato rilevato |
+| M-SZ-04 | Greenfield: la memoria delle VM DRAM-only (`DRAM_Fit = DRAM-only`, #38) si aggiunge alla DRAM minima. Stima prudente: l'active di quelle VM è già nell'active dell'host |
+| M-SZ-06 | avviso quando l'opzione di mirroring è disattivata (default invariato, quindi nessun effetto sui costi) |
+| M-SZ-07 | ratio personalizzato limitato a 1–400% (il minimo mancava) |
+| R-SZ-05 | overhead CPU (~1/8 di core su host piccoli) segnalato come nota, non calcolato |
+
+Formule: host per la DRAM = ⌈(active / 0,5 + DRAM-only) / (DRAM per host − system)⌉; DRAM minima per host
+= ⌈active per host⌉ / 0,5 + DRAM-only / host + system. Con system = 0 e senza VM DRAM-only coincidono
+con le formule precedenti (verificato sul gemello `lab-802`: costi e host identici a `main`).
+
 ### 2.5 Hardware e host (#40)
 
 | ID MTAT | Requisiti | Modalità |
@@ -153,6 +168,7 @@ sizing (§2.4). Diagnostica post-attivazione: `memstats` (vmtier-stats), secondo
 
 | Versione | Data | Modifiche |
 |---|---|---|
+| 0.7 | 2026-10-14 | M-SZ-02/03/04/06/07 nel simulatore (#39) |
 | 0.6 | 2026-10-14 | M-WL-01…03 implementati (soglie active per host e VM, #38) |
 | 0.5 | 2026-10-14 | M-VM-10 (> 60 vCPU su 9.0) implementato |
 | 0.4 | 2026-10-14 | GA 9.0 confermata (RN VCF 9.0), M-VER implementato (#37) |
