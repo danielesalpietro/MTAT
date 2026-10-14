@@ -5,3 +5,7 @@ secrets/
 *.secret
 *.password
 .env
+
+# Schede compilate e altri dati reali locali (vedi docs/brownfield-scheda-hardware.md)
+local/
+*.local.md
