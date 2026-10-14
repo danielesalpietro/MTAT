@@ -3,6 +3,13 @@
 Sessione cloud (claude.ai/code) di coordinamento. Etichetta `sessione:cloud-coordinamento`.
 Regole in `CLAUDE.md`. Voce più recente in alto.
 
+## 2026-10-14 19:05: #30 CI verde
+- **Verifiche**: CI su 0a13902 verde (2 run). Log: 5 moduli della catena di Core tutti
+  13.3.0.24145081 (Vim 8.3.0.24145081), `VMware.System.Private.ServiceModel 4.5.0.0` caricata,
+  gate superato, smoke test ok.
+- **Aperto**: rebuild e analisi Real-Time sul PC (ok di Daniele, già subordinato al verde); poi
+  test #29 (Read-only vs ruolo personalizzato). PR #27 di nuovo verde.
+
 ## 2026-10-14 19:00: #30 terza iterazione: solo la chiusura di VMware.VimAutomation.Core
 - **Obiettivo**: CI rossa su d795131 (dipendenza senza versione in StorageUtility) e 5519f4c
   (`VMware.Sdk.vSphere.vCenter.CertManagement` 1.0.0.0 non installabile da PSGallery): il meta
