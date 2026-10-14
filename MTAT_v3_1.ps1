@@ -218,6 +218,19 @@ function Get-TieringSupportLevel ($VersionString) {
     return "Supported"
 }
 
+# Per-VM Memory Tiering caveats that depend on the host's ESX version (#38). Source: VCF 9.0 release
+# notes, Known Issues > "Memory Tiering Issues": on ESX 9.0 hosts with tiering, VMs with more than
+# 60 vCPUs fail to power on; workaround Mem.VMOverheadGrowthLimit = 3. Scoped to 9.0.x because it is
+# documented there; revisit if a later release note lists it again or as fixed.
+function Get-VmTieringNotes ($HostVersion, $NumCpu) {
+    $notes = New-Object System.Collections.Generic.List[string]
+    $v = $null
+    if ([version]::TryParse("$HostVersion", [ref]$v) -and $v -ge [version]"9.0" -and $v -lt [version]"9.1" -and [int]$NumCpu -gt 60) {
+        $notes.Add("> 60 vCPU on ESX 9.0: may fail to power on with Memory Tiering (known issue; workaround Mem.VMOverheadGrowthLimit = 3)")
+    }
+    return ($notes -join "; ")
+}
+
 function Add-KnownIssueHints ($ExceptionText) {
     if ($ExceptionText -match "Permission to perform this operation was denied" -and $ExceptionText -match "System\.View") {
         return "$ExceptionText [Likely cause: the account authenticated but has no role on the vCenter inventory. Assign it at least the Read-only role on the vCenter root object (Hosts and Clusters, top level) with 'Propagate to children' enabled, then connect again.]"
@@ -934,6 +947,8 @@ $htmlContent = @'
                         <th class="sortable" data-type="text" onclick="sortTableByHeader(this)" title="Yes = memory is hardware-reservation-locked (vGPU, PCI passthrough, etc.) and can never be tiered to NVMe, regardless of how active it measures.">Pinned_Memory<span class="sort-arrow"></span></th>
                         <th class="sortable" data-type="num" onclick="sortTableByHeader(this)">Pages_1GB<span class="sort-arrow"></span></th>
                         <th class="sortable" data-type="num" onclick="sortTableByHeader(this)">Pages_2MB<span class="sort-arrow"></span></th>
+                        <th class="sortable" data-type="num" onclick="sortTableByHeader(this)">vCPU<span class="sort-arrow"></span></th>
+                        <th class="sortable" data-type="text" onclick="sortTableByHeader(this)" title="Version-specific Memory Tiering caveats for this VM (e.g. ESX 9.0 known issue for VMs with more than 60 vCPUs)">Tiering_Notes<span class="sort-arrow"></span></th>
                     </tr></thead><tbody></tbody></table>
                 </div>
             </div>
@@ -1802,7 +1817,7 @@ $htmlContent = @'
             var pinnedCell = (v.Pinned_Memory === "Yes")
                 ? "<span style=\"color:var(--text-warning-soft); font-weight:bold;\">Yes</span>"
                 : escapeHtml(v.Pinned_Memory || "N/A");
-            vBody.innerHTML += "<tr><td>" + escapeHtml(v.Host) + "</td><td>" + escapeHtml(v.VMName) + "</td><td>" + v.Provisioned_GB + "</td><td>" + v.Active_GB + "</td><td>" + v.Active_Pct + "%</td><td>" + pinnedCell + "</td><td>" + escapeHtml(v.Pages_1GB) + "</td><td>" + escapeHtml(v.Pages_2MB) + "</td></tr>";
+            vBody.innerHTML += "<tr><td>" + escapeHtml(v.Host) + "</td><td>" + escapeHtml(v.VMName) + "</td><td>" + v.Provisioned_GB + "</td><td>" + v.Active_GB + "</td><td>" + v.Active_Pct + "%</td><td>" + pinnedCell + "</td><td>" + escapeHtml(v.Pages_1GB) + "</td><td>" + escapeHtml(v.Pages_2MB) + "</td><td>" + escapeHtml(v.vCPU === undefined || v.vCPU === null ? "N/A" : v.vCPU) + "</td><td>" + escapeHtml(v.Tiering_Notes || "") + "</td></tr>";
         }
 
         document.getElementById('simClusterSelect').value = activeClusterValue;
@@ -2529,9 +2544,9 @@ $htmlContent = @'
             return csv;
         }
         if (type === 'vms') {
-            csv = "Host,VMName,Provisioned_GB,Active_GB,Active_Pct,Pinned_Memory,Pages_1GB,Pages_2MB\r\n";
+            csv = "Host,VMName,Provisioned_GB,Active_GB,Active_Pct,Pinned_Memory,Pages_1GB,Pages_2MB,vCPU,Tiering_Notes\r\n";
             for (var k = 0; k < cachedVms.length; k++) {
-                var v = cachedVms[k]; csv += csvField(v.Host) + "," + csvField(v.VMName) + "," + v.Provisioned_GB + "," + v.Active_GB + "," + v.Active_Pct + "," + csvField(v.Pinned_Memory || "N/A") + "," + csvField(v.Pages_1GB) + "," + csvField(v.Pages_2MB) + "\r\n";
+                var v = cachedVms[k]; csv += csvField(v.Host) + "," + csvField(v.VMName) + "," + v.Provisioned_GB + "," + v.Active_GB + "," + v.Active_Pct + "," + csvField(v.Pinned_Memory || "N/A") + "," + csvField(v.Pages_1GB) + "," + csvField(v.Pages_2MB) + "," + csvField(v.vCPU === undefined || v.vCPU === null ? "N/A" : v.vCPU) + "," + csvField(v.Tiering_Notes || "") + "\r\n";
             }
             return csv;
         }
@@ -2558,7 +2573,7 @@ $htmlContent = @'
         // readability when the CSV is opened directly, and as a fallback when re-importing an older
         // exported file that predates these two columns.
         var globalHostCsv = "Cluster,RangeName,ClusterContext,HostName,Tiering,CPU_Pct,Physical_RAM,Consumed_GB,Active_GB,Active_Pct,TieringSupport\r\n";
-        var globalVmCsv = "Cluster,RangeName,ClusterContext,Host,VMName,Provisioned_GB,Active_GB,Active_Pct,Pinned_Memory,Pages_1GB,Pages_2MB\r\n";
+        var globalVmCsv = "Cluster,RangeName,ClusterContext,Host,VMName,Provisioned_GB,Active_GB,Active_Pct,Pinned_Memory,Pages_1GB,Pages_2MB,vCPU,Tiering_Notes\r\n";
 
         for (var clusterKey in clusterSessionCache) {
             var cache = clusterSessionCache[clusterKey];
@@ -2574,7 +2589,7 @@ $htmlContent = @'
                 }
                 var vArr = dataObj.vms || [];
                 for (var y = 0; y < vArr.length; y++) {
-                    var v = vArr[y]; globalVmCsv += safeCluster + "," + safeRange + "," + clusterContext + "," + csvField(v.Host) + "," + csvField(v.VMName) + "," + v.Provisioned_GB + "," + v.Active_GB + "," + v.Active_Pct + "," + csvField(v.Pinned_Memory || "N/A") + "," + csvField(v.Pages_1GB) + "," + csvField(v.Pages_2MB) + "\r\n";
+                    var v = vArr[y]; globalVmCsv += safeCluster + "," + safeRange + "," + clusterContext + "," + csvField(v.Host) + "," + csvField(v.VMName) + "," + v.Provisioned_GB + "," + v.Active_GB + "," + v.Active_Pct + "," + csvField(v.Pinned_Memory || "N/A") + "," + csvField(v.Pages_1GB) + "," + csvField(v.Pages_2MB) + "," + csvField(v.vCPU === undefined || v.vCPU === null ? "N/A" : v.vCPU) + "," + csvField(v.Tiering_Notes || "") + "\r\n";
                 }
             }
         }
@@ -2765,7 +2780,7 @@ $htmlContent = @'
                 if (isNaN(vActivePct)) vActivePct = provisioned > 0 ? Math.round((vActive / provisioned) * 1000) / 10 : 0;
                 vms.push({
                     Host: v.Host || "", VMName: v.VMName || "", Provisioned_GB: provisioned, Active_GB: vActive,
-                    Active_Pct: vActivePct, Pinned_Memory: v.Pinned_Memory || "N/A", Pages_1GB: v.Pages_1GB || "N/A", Pages_2MB: v.Pages_2MB || "N/A"
+                    Active_Pct: vActivePct, Pinned_Memory: v.Pinned_Memory || "N/A", Pages_1GB: v.Pages_1GB || "N/A", Pages_2MB: v.Pages_2MB || "N/A", vCPU: v.vCPU || "N/A", Tiering_Notes: v.Tiering_Notes || ""
                 });
             }
         }
@@ -3074,7 +3089,7 @@ $htmlContent = @'
 
                 vg.vms.push({
                     Host: v.Host || "", VMName: v.VMName || "", Provisioned_GB: provisioned, Active_GB: vActive,
-                    Active_Pct: vActivePct, Pinned_Memory: v.Pinned_Memory || "N/A", Pages_1GB: v.Pages_1GB || "N/A", Pages_2MB: v.Pages_2MB || "N/A"
+                    Active_Pct: vActivePct, Pinned_Memory: v.Pinned_Memory || "N/A", Pages_1GB: v.Pages_1GB || "N/A", Pages_2MB: v.Pages_2MB || "N/A", vCPU: v.vCPU || "N/A", Tiering_Notes: v.Tiering_Notes || ""
                 });
             }
         }
@@ -3802,11 +3817,17 @@ while ($listener.IsListening) {
                         # the per-host commit below for why. $totalActiveGB_Avg has no host-level
                         # counterpart shown anywhere in the UI (it's a VM-only reference figure), so it's
                         # fine to keep building it from per-VM values regardless of mode.
+                        $vmNumCpu = [int]$vm.NumCpu
+                        $vmTieringNotes = Get-VmTieringNotes $h.Version $vmNumCpu
+                        if ($vmTieringNotes) {
+                            Write-DebugLog "[analyze] WARNING: VM '$($vm.Name)' on host '$currentHostName' (ESXi $($h.Version)): $vmTieringNotes"
+                        }
                         $totalActiveGB_Avg += $activeGB_Avg
                         $vmResults.Add([PSCustomObject]@{
                             Host = $currentHostName; VMName = $vm.Name; Provisioned_GB = [math]::Round($vm.MemoryGB); Active_GB = $activeGB
                             Active_Pct = if($vm.MemoryGB -gt 0){[math]::Round(($activeGB/$vm.MemoryGB)*100,1)}else{0}; Pinned_Memory = $pinnedMemory
                             Pages_1GB = $page1GB; Pages_2MB = $page2MB
+                            vCPU = $vmNumCpu; Tiering_Notes = $vmTieringNotes
                         })
                       } catch {
                         $failedVmNames.Add("$currentHostName/$($vm.Name)")

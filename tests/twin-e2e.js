@@ -52,6 +52,11 @@ const list = (x) => (x == null ? [] : Array.isArray(x) ? x : [x]);
       assert(hosts[name], `${tag}: host ${name} missing`);
       for (const [k, v] of Object.entries(fields)) near(hosts[name][k], v, `${tag}: ${name}.${k}`);
     }
+    const vms = Object.fromEntries(list(res.vms).map((v) => [v.VMName, v]));
+    for (const [name, fields] of Object.entries(a.vms || {})) {
+      assert(vms[name], `${tag}: VM ${name} missing`);
+      for (const [k, v] of Object.entries(fields)) assert.strictEqual(vms[name][k], v, `${tag}: ${name}.${k}`);
+    }
     console.log(`[${scenario.name}] analyze ok: ${tag}`);
   }
   console.log(`[${scenario.name}] ALL OK`);

@@ -25,7 +25,7 @@ un vCenter reale. Il progetto separato (`-p mtat-twin`, porta 8601) non tocca il
 | Scenario | Copre |
 |---|---|
 | `lab-802` | riproduce `vc-lab-01`: 1 host ESXi 8.0.2 da 96 GB, 2 VM accese, una spenta; Not supported |
-| `mixed-90` | vCenter 9.0, cluster misto: 8.0.3 con tiering attivo (Tech preview), 9.0 con CLI legacy e `Mem.TierNVMePct=50`, 9.0 disattivo, 9.0 con esxcli in errore, 8.0.2; VM pinned, `sched.mem.enableTiering=FALSE`, Latency Sensitivity High, VM non risolvibile; storici a livello 2 |
+| `mixed-90` | vCenter 9.0, cluster misto: 8.0.3 con tiering attivo (Tech preview), 9.0 con CLI legacy e `Mem.TierNVMePct=50`, 9.0 disattivo, 9.0 con esxcli in errore, 8.0.2; VM pinned, `sched.mem.enableTiering=FALSE`, Latency Sensitivity High, VM non risolvibile; due VM da 64 vCPU (nota known issue 9.0 solo su host 9.0); storici a livello 2 |
 | `no-clusters` | vCenter senza cluster e vCenter con login rifiutato |
 
 Struttura: `vcenters[]` → `statsIntervals[]` (key, samplingPeriod, level, enabled) e `clusters[]` →
