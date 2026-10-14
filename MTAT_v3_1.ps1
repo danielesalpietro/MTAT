@@ -644,6 +644,46 @@ $htmlContent = @'
         .tab-header { display: flex; border-bottom: 2px solid var(--border); margin-bottom: 25px; align-items: flex-end; }
         .tab-header-btn { flex: 1 1 0; padding: 12px; background: var(--surface-page); border: 1px solid var(--border); border-bottom: none; font-size: 15px; font-weight: bold; color: var(--text-secondary); cursor: pointer; text-align: center; }
         .tab-header-btn.active { background: var(--surface-card); color: var(--text-primary); border-top: 3px solid var(--fill-accent); margin-bottom: -2px; font-weight: bold; }
+        /* Brownfield checklist (tab 4): Setup Support Rules layout, phases on the left, rules on the right */
+        .chk-summary { font-size: 14px; margin-bottom: 8px; color: var(--text-secondary); }
+        .chk-progress { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin-bottom: 18px; background: var(--soft-bg-accent); }
+        .chk-progress span { display: block; height: 100%; }
+        .chk-seg-passed { background: var(--text-success); }
+        .chk-seg-warning { background: var(--text-warning-soft); }
+        .chk-seg-failed { background: var(--text-danger-soft); }
+        .chk-seg-skipped { background: var(--text-muted); }
+        .chk-layout { display: grid; grid-template-columns: 230px 1fr; border: 1px solid var(--border); min-height: 380px; }
+        .chk-nav { border-right: 1px solid var(--border); background: var(--surface-page); }
+        .chk-nav-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px 14px; border: none; border-left: 3px solid transparent; background: transparent; color: var(--text-primary); font-size: 14px; text-align: left; cursor: pointer; }
+        .chk-nav-item:hover { background: var(--soft-bg-accent); }
+        .chk-nav-item.active { border-left-color: var(--fill-accent); font-weight: bold; background: var(--surface-card); }
+        .chk-nav-icon { width: 18px; text-align: center; font-weight: bold; }
+        .chk-nav-count { margin-left: auto; font-size: 11px; color: var(--text-muted); }
+        .chk-ico-passed { color: var(--text-success-soft); }
+        .chk-ico-warning { color: var(--text-warning-soft); }
+        .chk-ico-failed { color: var(--text-danger-soft); }
+        .chk-ico-skipped { color: var(--text-muted); }
+        .chk-main { padding: 16px 18px; min-width: 0; }
+        .chk-phase-title { font-size: 17px; font-weight: bold; }
+        .chk-phase-sub { font-size: 12px; color: var(--text-muted); margin: 4px 0 14px 0; font-style: italic; }
+        .chk-table { width: 100%; }
+        .chk-rule-title { font-weight: bold; }
+        .chk-rule-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+        .chk-detail { font-size: 13px; }
+        .chk-badge { display: inline-block; min-width: 84px; text-align: center; padding: 3px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; border: 1px solid transparent; }
+        .chk-badge.chk-passed { background: var(--soft-bg-success); color: var(--text-success-soft); }
+        .chk-badge.chk-warning { background: var(--soft-bg-warning); color: var(--text-warning-soft); border-color: var(--soft-border-warning); }
+        .chk-badge.chk-failed { background: var(--soft-bg-danger); color: var(--text-danger-soft); border-color: var(--soft-border-danger); }
+        .chk-badge.chk-skipped { background: var(--soft-bg-info); color: var(--text-info-soft); }
+        .chk-manual { margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
+        .chk-manual select, .chk-manual input { font-size: 12px; padding: 4px 6px; }
+        .chk-main .table-scroll-box { overflow-x: auto; }
+        @media (max-width: 720px) {
+            .chk-layout { grid-template-columns: 1fr; }
+            .chk-nav { display: flex; overflow-x: auto; border-right: none; border-bottom: 1px solid var(--border); }
+            .chk-nav-item { width: auto; white-space: nowrap; border-left: none; border-bottom: 3px solid transparent; }
+            .chk-nav-item.active { border-bottom-color: var(--fill-accent); }
+        }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
         .form-panel { background: var(--surface-alt); padding: 25px; border-radius: 6px; margin-bottom: 25px; border: 1px solid var(--border); }
@@ -805,6 +845,7 @@ $htmlContent = @'
             <button class="tab-header-btn active" id="btn-tab-connect" role="tab" aria-selected="true" aria-controls="tab-connect" onclick="switchTab('tab-connect', this)">1. vCenter Connection</button>
             <button class="tab-header-btn" id="btn-tab-baseline" role="tab" aria-selected="false" aria-controls="tab-baseline" onclick="switchTab('tab-baseline', this)" style="display:none;">2. Baseline Assessment</button>
             <button class="tab-header-btn" id="btn-tab-simulator" role="tab" aria-selected="false" aria-controls="tab-simulator" onclick="switchTab('tab-simulator', this)" style="display:none;">3. Sizing &amp; Savings</button>
+            <button class="tab-header-btn" id="btn-tab-checklist" role="tab" aria-selected="false" aria-controls="tab-checklist" onclick="switchTab('tab-checklist', this)" style="display:none;">4. Brownfield Checklist</button>
         </div>
         <button class="btn btn-sm theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" style="margin-bottom: 6px; margin-left: 15px; height: 28px; width: auto; padding: 0 15px;" title="Toggle light/dark appearance">&#9789; <span id="themeToggleLabel">Dark Mode</span></button>
         <button class="btn btn-sm" onclick="downloadDebugLog()" style="margin-bottom: 6px; margin-left: 15px; height: 28px; width: auto; padding: 0 15px; background-color:#5a6268;" title="Download this session's debug log -- useful if data looks incomplete or wrong">Download Debug Log</button>
@@ -988,6 +1029,30 @@ $htmlContent = @'
         </div>
     </div>
     
+    <div id="tab-checklist" class="tab-content" role="tabpanel" aria-labelledby="btn-tab-checklist">
+        <div class="section-block">
+            <div class="action-container">
+                <div class="grid-title">Brownfield Readiness Checklist</div>
+                <button class="btn btn-sm" onclick="refreshBrownfieldChecklist()">Re-run checks</button>
+            </div>
+            <div id="chkSummary" class="chk-summary"></div>
+            <div id="chkProgress" class="chk-progress"></div>
+            <div class="chk-layout">
+                <nav class="chk-nav" id="chkNav" aria-label="Checklist phases"></nav>
+                <div class="chk-main">
+                    <div class="chk-phase-title" id="chkPhaseTitle"></div>
+                    <div class="chk-phase-sub" id="chkPhaseSub"></div>
+                    <div class="table-scroll-box">
+                        <table class="chk-table">
+                            <thead><tr><th style="width:42%;">Rule</th><th style="width:110px;">Status</th><th>Details</th></tr></thead>
+                            <tbody id="chkBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div style="font-size:11px; color:var(--text-muted); margin-top:8px; font-style:italic;">Automatic rules read the analysis on screen. Manual rules are set by the engineer: MTAT does not collect that data. Manual outcomes are kept in this browser only.</div>
+        </div>
+    </div>
     <div id="tab-simulator" class="tab-content" role="tabpanel" aria-labelledby="btn-tab-simulator">
         <div class="info-panel-box" style="margin-bottom: 20px;">&#9432; <strong>Note:</strong> All figures are estimated projections based on your cluster's peak Active Memory usage (worst-case) alongside average CPU and Consumed Memory, plus user-entered pricing. They are intended for planning purposes only and do not represent a formal quote or guaranteed outcome.</div>
         <div class="control-grid" style="grid-template-columns: 1fr 1fr; gap:15px; align-items: flex-end; margin-bottom: 20px;">
@@ -1440,6 +1505,275 @@ $htmlContent = @'
         .catch(function(err) { showToast("Could not reach the engine to fetch the debug log: " + err.message, 'error'); });
     }
 
+    // ---- Brownfield readiness checklist (tab 4) ----
+    // Same layout as the SQL Server "Setup Support Rules" page: phases on the left, one row per rule.
+    // Rule ids and requirements follow vsphere-memory-tiering-checklist-brownfield.md. Automatic rules
+    // read the analysis already on screen. Manual rules are set by the engineer, because MTAT does not
+    // collect that data (HA/DRS/vSAN settings, NVMe hardware, VM exclusion flags).
+    var CHK_STORAGE_KEY = 'mtat.brownfieldChecklist.v1';
+    var chkManual = chkLoadManual();   // rule id -> { status, note }, persisted per browser
+    var chkSnapshot = null;            // failed hosts/VMs of the last analysis, set by applyAnalysisResult()
+    var chkResults = {};               // rule id -> { status, detail }
+    var chkActivePhase = 'cluster';
+
+    var CHK_PHASES = [
+        { id: 'cluster', title: 'Cluster', sub: 'Settings the cluster must provide: HA, DRS, vSAN, configuration profiles.' },
+        { id: 'hosts', title: 'Hosts', sub: 'ESXi state and memory of each physical host.' },
+        { id: 'nvme', title: 'NVMe hardware', sub: 'Device type, endurance, capacity, redundancy and slots of the tier drives.' },
+        { id: 'vms', title: 'Virtual machines', sub: 'VMs that cannot be tiered, large VMs and page settings.' },
+        { id: 'metrics', title: 'Metrics', sub: 'Active, consumed and CPU values against the requirements.' },
+        { id: 'result', title: 'Result', sub: '' }
+    ];
+
+    var CHK_RULES = [
+        // Cluster (manual)
+        { id: 'CL-01', phase: 'cluster', manual: true, title: 'HA enabled, with a restart policy', req: 'A VM that loses NVMe pages powers off; HA restarts it on another host.', src: 'PDF s.11' },
+        { id: 'CL-02', phase: 'cluster', manual: true, title: 'DRS enabled, automation level defined', req: 'DRS balances VMs on tiered hosts using their active memory.', src: 'PDF s.10' },
+        { id: 'CL-03', phase: 'cluster', manual: true, title: 'vSAN does not claim the tier drive', req: 'A tier drive cannot be a vSAN cache or data disk. Auto Disk Claim off when adding disks.', src: 'PDF s.8.8' },
+        { id: 'CL-04', phase: 'cluster', manual: true, title: 'Cluster managed by one image (Configuration Profiles)', req: 'Required to configure tiering at cluster level.', src: 'PDF s.8.2' },
+        { id: 'CL-05', phase: 'cluster', manual: true, title: 'Failover capacity without the largest host', req: 'After losing a host, DRAM and NVMe must still hold the running VMs.', src: 'Checklist B-01' },
+        { id: 'CL-06', phase: 'cluster', manual: true, title: 'Statistics Level 2 on the analysed range', req: 'Needed for historical ranges. Not a requirement of the tier itself.', src: 'Issue #28' },
+
+        // Hosts
+        { id: 'HO-01', phase: 'hosts', title: 'Tiering state readable on every host', req: 'MTAT must read the tiering state of each host, or the sizing starts from a wrong base.', src: 'Issue #29', check: function (c) {
+            var err = c.hosts.filter(function (h) { return h.Tiering === 'ERROR'; });
+            var unk = c.hosts.filter(function (h) { return String(h.Tiering).indexOf('Unknown') === 0; });
+            if (!c.hosts.length) return { status: 'skipped', detail: 'No host data in this analysis.' };
+            if (err.length) return { status: 'failed', detail: 'Tiering query failed on: ' + chkNames(err, 'HostName') + '.' };
+            if (unk.length) return { status: 'warning', detail: 'Tiering state not readable on: ' + chkNames(unk, 'HostName') + '. Check the host privilege Host.Config.AdvancedConfig.' };
+            return { status: 'passed', detail: 'Tiering state read on ' + c.hosts.length + ' host(s).' };
+        } },
+        { id: 'HO-02', phase: 'hosts', title: 'ESXi version at least 9.1', req: 'Memory Tiering requires ESXi 9.1 or later on every host.', src: 'PDF s.2', check: function (c) {
+            var old = c.hosts.filter(function (h) { return String(h.Tiering).indexOf('Not supported') === 0; });
+            if (old.length) return { status: 'failed', detail: old.length + ' host(s) below the minimum: ' + chkNames(old, 'HostName') + '. State: ' + old[0].Tiering + '. Upgrade before any Brownfield plan.' };
+            return { status: 'skipped', detail: 'The version is not exported by MTAT. Check the Summary tab of each host.' };
+        } },
+        { id: 'HO-03', phase: 'hosts', title: 'Peak active memory per host at most 50% of DRAM', req: 'Active memory must fit in DRAM. Above 50% the tier adds little.', src: 'PDF s.6.1', check: function (c) {
+            var over = c.hosts.filter(function (h) { return Number(h.Active_Pct) > 50; });
+            if (over.length) return { status: 'warning', detail: over.length + ' host(s) above 50%: ' + chkNames(over, 'HostName') + '.' };
+            return { status: 'passed', detail: 'All hosts at or below 50% of DRAM.' };
+        } },
+        { id: 'HO-04', phase: 'hosts', title: 'Host data collected without errors', req: 'A host that failed collection is missing from the totals.', src: 'MTAT', check: function (c) {
+            if (c.failedHosts.length) return { status: 'warning', detail: 'Collection failed for: ' + c.failedHosts.join(', ') + '.' };
+            return { status: 'passed', detail: 'No host failed collection.' };
+        } },
+        { id: 'HO-05', phase: 'hosts', manual: true, title: 'No Optane Persistent Memory or NVDIMM-N installed', req: 'Both are unsupported with Memory Tiering and must be removed.', src: 'PDF s.4' },
+        { id: 'HO-06', phase: 'hosts', manual: true, title: 'Quick Boot disabled', req: 'Quick Boot is not supported on hosts with tiering active.', src: 'PDF s.4' },
+        { id: 'HO-07', phase: 'hosts', manual: true, title: 'Maintenance mode possible for configuration', req: 'Activate, deactivate or reconfigure the tier only in maintenance mode.', src: 'PDF s.4, s.9.1' },
+
+        // NVMe hardware (manual: none of this is exported by MTAT)
+        { id: 'NV-01', phase: 'nvme', manual: true, title: 'Local NVMe device (no fabric, Ethernet, SATA, SAS, FC, iSCSI or NFS)', req: 'The tier needs a PCIe NVMe drive installed in the host.', src: 'PDF s.3.1' },
+        { id: 'NV-02', phase: 'nvme', manual: true, title: 'Mixed Use endurance, at least 3 DWPD', req: 'Drive Writes Per Day of 3 or more.', src: 'PDF s.3.1' },
+        { id: 'NV-03', phase: 'nvme', manual: true, title: 'BCG endurance class D (at least 7300 TBW)', req: 'Or the OEM equivalent. Check in the Broadcom Compatibility Guide.', src: 'PDF s.3.2' },
+        { id: 'NV-04', phase: 'nvme', manual: true, title: 'BCG performance class F or G', req: 'F: 100,000-349,999 writes/s. G: 350,000 writes/s or more.', src: 'PDF s.3.2' },
+        { id: 'NV-05', phase: 'nvme', manual: true, title: 'Drive capacity at least the host DRAM', req: 'Recommended. The effective tier is the smaller of ratio and partition.', src: 'PDF s.3.3' },
+        { id: 'NV-06', phase: 'nvme', manual: true, title: 'Tier capacity up to 4096 GB per host', req: 'Sizing limit of the tier partition.', src: 'PDF s.3.3' },
+        { id: 'NV-07', phase: 'nvme', manual: true, title: 'Drive dedicated to tiering', req: 'Not boot, not vSAN, not used by other services.', src: 'PDF s.3.1' },
+        { id: 'NV-08', phase: 'nvme', manual: true, title: 'Existing partitions deleted', req: 'Delete all partitions before use (Broadcom KB 323144).', src: 'PDF s.3.1' },
+        { id: 'NV-09', phase: 'nvme', manual: true, title: 'Redundancy chosen: software mirror or RAID', req: 'Software mirror: 2 drives, same or larger capacity. Or a supported RAID controller.', src: 'PDF s.8.7' },
+        { id: 'NV-10', phase: 'nvme', manual: true, title: 'RAID controller supported, one logical device (if RAID)', req: 'Tri-Mode, 24G, or Intel VROC, per the PDF.', src: 'PDF s.8.7.2' },
+        { id: 'NV-11', phase: 'nvme', manual: true, title: 'Free NVMe slots on the server', req: 'Two slots with software mirror.', src: 'PDF s.3.1, s.8.7' },
+        { id: 'NV-12', phase: 'nvme', manual: true, title: 'No hot-plug on the tier drive', req: 'Hot-plug and prepare-to-remove are not supported. Disable tiering to replace it.', src: 'PDF s.4 (HW-06)' },
+
+        // Virtual machines
+        { id: 'VM-01', phase: 'vms', title: 'VMs with locked memory (passthrough, vGPU)', req: 'Locked memory never leaves DRAM and gets no benefit from the tier.', src: 'Issue #36', check: function (c) {
+            var pinned = c.vms.filter(function (v) { return v.Pinned_Memory === 'Yes'; });
+            if (pinned.length) {
+                var gb = pinned.reduce(function (s, v) { return s + (Number(v.Provisioned_GB) || 0); }, 0);
+                return { status: 'warning', detail: pinned.length + ' VM(s), ' + gb + ' GB locked: ' + chkNames(pinned, 'VMName') + '. Excluded from the tier.' };
+            }
+            return { status: 'passed', detail: 'No VM with locked memory.' };
+        } },
+        { id: 'VM-02', phase: 'vms', title: 'VMs above 512 GB of memory', req: 'Above 512 GB and 64 vCPU, performance may degrade. Disable tiering and reserve memory.', src: 'PDF s.7.1', check: function (c) {
+            var big = c.vms.filter(function (v) { return Number(v.Provisioned_GB) > 512; });
+            if (big.length) return { status: 'warning', detail: big.length + ' VM(s) above 512 GB: ' + chkNames(big, 'VMName') + '. The vCPU count is not exported: check the 64 vCPU limit.' };
+            return { status: 'passed', detail: 'No VM above 512 GB.' };
+        } },
+        { id: 'VM-03', phase: 'vms', title: 'VMs with 1 GB large pages', req: 'Tiered VMs use 4 KB pages. Check the large-page settings before tiering.', src: 'Issue #36', check: function (c) {
+            var lp = c.vms.filter(function (v) { return String(v.Pages_1GB).toLowerCase() === 'true'; });
+            if (lp.length) return { status: 'warning', detail: lp.length + ' VM(s) with 1 GB pages: ' + chkNames(lp, 'VMName') + '.' };
+            return { status: 'passed', detail: 'No VM with 1 GB pages.' };
+        } },
+        { id: 'VM-04', phase: 'vms', title: 'VMs with peak active memory at most 50% of their memory', req: 'Heuristic: a VM that is hot on most of its memory gains little from the tier.', src: 'PDF s.6.1', check: function (c) {
+            var hot = c.vms.filter(function (v) { return Number(v.Active_Pct) > 50; });
+            if (hot.length) return { status: 'warning', detail: hot.length + ' VM(s) above 50%: ' + chkNames(hot, 'VMName') + '.' };
+            return { status: 'passed', detail: 'All VMs at or below 50%.' };
+        } },
+        { id: 'VM-05', phase: 'vms', manual: true, title: 'Excluded VMs have tiering disabled (sched.mem.enableTiering = FALSE)', req: 'Set per VM with a full memory reservation. MTAT does not export this flag.', src: 'PDF s.9.3' },
+        { id: 'VM-06', phase: 'vms', manual: true, title: 'Other exclusions checked: FT, Latency Sensitivity High, Confidential, Nested, Large', req: 'These VMs are excluded from the tier. Confirm their list.', src: 'PDF s.7.1, Issues #36, #42' },
+        { id: 'VM-07', phase: 'vms', manual: true, title: 'Excluded VMs have a full memory reservation', req: 'Without it, pages go to the host swap file, which is slower than the tier.', src: 'PDF s.10 (reservations)' },
+        { id: 'VM-08', phase: 'vms', manual: true, title: 'No VM uses suspend to memory', req: 'Suspend to memory is not supported on a host with tiering. Suspend to disk is.', src: 'PDF s.4, s.5' },
+
+        // Metrics
+        { id: 'MT-01', phase: 'metrics', title: 'Cluster peak active memory at most 50% of DRAM', req: 'Active memory must fit in DRAM at any time.', src: 'PDF s.6.1', check: function (c) {
+            var p = c.activePct;
+            if (p > 100) return { status: 'failed', detail: p.toFixed(1) + '% of DRAM. Active memory does not fit in DRAM.' };
+            if (p > 50) return { status: 'warning', detail: p.toFixed(1) + '% of DRAM (limit 50%).' };
+            return { status: 'passed', detail: p.toFixed(1) + '% of DRAM (limit 50%).' };
+        } },
+        { id: 'MT-02', phase: 'metrics', title: 'Consumed memory at least 80% of DRAM', req: 'The tier starts around 80% of DRAM. Below that there is no memory pressure yet.', src: 'PDF s.11', check: function (c) {
+            if (c.consumedPct < 80) return { status: 'warning', detail: c.consumedPct.toFixed(1) + '% of DRAM. A weak candidate for now.' };
+            return { status: 'passed', detail: c.consumedPct.toFixed(1) + '% of DRAM.' };
+        } },
+        { id: 'MT-03', phase: 'metrics', title: 'CPU average at most 50%', req: 'Accessing the NVMe tier costs CPU cycles.', src: 'MTAT target', check: function (c) {
+            if (c.cpu > 50) return { status: 'warning', detail: c.cpu + '% average CPU (target 50%).' };
+            return { status: 'passed', detail: c.cpu + '% average CPU.' };
+        } },
+        { id: 'VM-09', phase: 'vms', title: 'VM data collected without errors', req: 'A VM that failed collection is missing from the totals.', src: 'MTAT', check: function (c) { if (c.failedVms.length) return { status: 'warning', detail: 'Collection failed for: ' + c.failedVms.join(', ') + '.' }; return { status: 'passed', detail: 'No VM failed collection.' }; } },
+        { id: 'MT-04', phase: 'metrics', manual: true, title: 'NVMe read bandwidth and latency checked', req: 'If read bandwidth exceeds 200 MB/s, monitor device latency (below 200 microseconds).', src: 'PDF s.6.4' }
+    ];
+
+    function chkLoadManual() {
+        try { return JSON.parse(localStorage.getItem(CHK_STORAGE_KEY) || '{}') || {}; }
+        catch (e) { return {}; }
+    }
+
+    function chkSaveManual() {
+        try { localStorage.setItem(CHK_STORAGE_KEY, JSON.stringify(chkManual)); }
+        catch (e) { /* storage blocked (private window): the outcomes stay in memory for this page */ }
+    }
+
+    // Names of the first few items of a list, plus a count of the rest. Plain text: escaped at render time.
+    function chkNames(list, key) {
+        var names = list.map(function (x) { return x[key]; });
+        var shown = names.slice(0, 5).join(', ');
+        return names.length > 5 ? shown + ' and ' + (names.length - 5) + ' more' : shown;
+    }
+
+    function chkBuildContext() {
+        var hosts = cachedHosts || [];
+        var vms = cachedVms || [];
+        var dram = globalDram || 0;
+        var snap = chkSnapshot || { failedHosts: [], failedVms: [] };
+        return {
+            hosts: hosts,
+            vms: vms,
+            hasData: hosts.length > 0 || vms.length > 0 || dram > 0,
+            activePct: dram > 0 ? (globalActive / dram) * 100 : 0,
+            consumedPct: dram > 0 ? (globalConsumed / dram) * 100 : 0,
+            cpu: globalCpu || 0,
+            failedHosts: snap.failedHosts || [],
+            failedVms: snap.failedVms || []
+        };
+    }
+
+    function chkLabel(status) { return { passed: 'Passed', failed: 'Failed', warning: 'Warning', skipped: 'Skipped' }[status] || status; }
+    function chkIcon(status) { return { passed: '&#10004;', failed: '&#10006;', warning: '&#9888;', skipped: '&#8943;' }[status] || ''; }
+    function chkRes(id) { return chkResults[id] || { status: 'skipped', detail: 'Not evaluated yet.' }; }
+
+    function chkCounts(rules) {
+        var counts = { passed: 0, failed: 0, warning: 0, skipped: 0 };
+        rules.forEach(function (r) { counts[chkRes(r.id).status]++; });
+        return counts;
+    }
+
+    // Worst status of a group: failed, then warning, then skipped (still open), else passed.
+    function chkGroupStatus(rules) {
+        var counts = chkCounts(rules);
+        if (counts.failed) return 'failed';
+        if (counts.warning) return 'warning';
+        if (counts.skipped) return 'skipped';
+        return 'passed';
+    }
+
+    function chkDecision(counts) {
+        if (counts.failed) return 'Not ready: ' + counts.failed + ' check(s) failed. Resolve them before a Brownfield plan.';
+        if (counts.skipped) return 'Incomplete: ' + counts.skipped + ' check(s) still need an outcome or data.';
+        if (counts.warning) return 'Ready with reservations: ' + counts.warning + ' warning(s) to document.';
+        return 'Ready: all checks passed.';
+    }
+
+    // Runs every automatic rule against the current analysis. Manual rules take the saved outcome.
+    function refreshBrownfieldChecklist() {
+        var c = chkBuildContext();
+        var fresh = {};
+        CHK_RULES.forEach(function (r) {
+            var m = chkManual[r.id] || {};
+            if (r.manual) {
+                fresh[r.id] = { status: m.status || 'skipped', detail: m.note || 'Manual check: MTAT does not collect this item.' };
+            } else if (!c.hasData) {
+                fresh[r.id] = { status: 'skipped', detail: 'Run an analysis first (step 2).' };
+            } else {
+                try { fresh[r.id] = r.check(c); }
+                catch (e) { fresh[r.id] = { status: 'skipped', detail: 'Check could not run: ' + e.message }; }
+            }
+        });
+        chkResults = fresh;
+        renderBrownfieldChecklist();
+    }
+
+    function chkSelectPhase(id) {
+        chkActivePhase = id;
+        renderBrownfieldChecklist();
+    }
+
+    function chkSetManual(id, status) {
+        chkManual[id] = Object.assign({}, chkManual[id], { status: status });
+        chkSaveManual();
+        refreshBrownfieldChecklist();
+    }
+
+    function chkSetNote(id, note) {
+        chkManual[id] = Object.assign({}, chkManual[id], { note: note });
+        chkSaveManual();
+        refreshBrownfieldChecklist();
+    }
+
+    function chkManualControls(r) {
+        var m = chkManual[r.id] || {};
+        var current = chkRes(r.id).status;
+        var opts = ['skipped', 'passed', 'warning', 'failed'].map(function (s) {
+            return '<option value="' + s + '"' + (current === s ? ' selected' : '') + '>' + chkLabel(s) + '</option>';
+        }).join('');
+        return '<div class="chk-manual">' +
+            '<select aria-label="Outcome for ' + r.id + '" onchange="chkSetManual(\'' + r.id + '\', this.value)">' + opts + '</select>' +
+            '<input type="text" placeholder="Note: value and source" aria-label="Note for ' + r.id + '" value="' + escapeHtml(m.note || '') + '" style="min-width:160px;" onchange="chkSetNote(\'' + r.id + '\', this.value)">' +
+            '</div>';
+    }
+
+    function renderBrownfieldChecklist() {
+        var body = document.getElementById('chkBody');
+        if (!body) return;
+        var counts = chkCounts(CHK_RULES);
+        var total = CHK_RULES.length || 1;
+
+        document.getElementById('chkSummary').innerHTML = 'Checks: Passed ' + counts.passed + '. Failed ' + counts.failed +
+            '. Warning ' + counts.warning + '. Skipped ' + counts.skipped + ' (manual or not collected).';
+        document.getElementById('chkProgress').innerHTML = ['passed', 'warning', 'failed', 'skipped'].map(function (s) {
+            return '<span class="chk-seg-' + s + '" style="width:' + (counts[s] / total * 100).toFixed(2) + '%;"></span>';
+        }).join('');
+
+        document.getElementById('chkNav').innerHTML = CHK_PHASES.map(function (p) {
+            var rules = p.id === 'result' ? CHK_RULES : CHK_RULES.filter(function (r) { return r.phase === p.id; });
+            var st = chkGroupStatus(rules);
+            return '<button class="chk-nav-item' + (chkActivePhase === p.id ? ' active' : '') + '" onclick="chkSelectPhase(\'' + p.id + '\')">' +
+                '<span class="chk-nav-icon chk-ico-' + st + '">' + chkIcon(st) + '</span>' + escapeHtml(p.title) +
+                (p.id === 'result' ? '' : '<span class="chk-nav-count">' + rules.length + '</span>') + '</button>';
+        }).join('');
+
+        var phase = CHK_PHASES.filter(function (p) { return p.id === chkActivePhase; })[0] || CHK_PHASES[0];
+        var rows = chkActivePhase === 'result'
+            ? CHK_RULES.filter(function (r) { return chkRes(r.id).status !== 'passed'; })
+            : CHK_RULES.filter(function (r) { return r.phase === phase.id; });
+
+        document.getElementById('chkPhaseTitle').innerText = phase.title;
+        document.getElementById('chkPhaseSub').innerText = phase.id === 'result'
+            ? chkDecision(counts) + ' Listed: every rule not yet passed.'
+            : phase.sub;
+
+        body.innerHTML = rows.map(function (r) {
+            var res = chkRes(r.id);
+            var controls = r.manual ? chkManualControls(r) : '';
+            return '<tr>' +
+                '<td><div class="chk-rule-title">' + escapeHtml(r.title) + '</div>' +
+                '<div class="chk-rule-meta">' + escapeHtml(r.id) + ' &middot; ' + escapeHtml(r.src) + '</div>' +
+                '<div class="chk-rule-meta">' + escapeHtml(r.req) + '</div></td>' +
+                '<td><span class="chk-badge chk-' + res.status + '">' + chkLabel(res.status) + '</span></td>' +
+                '<td><div class="chk-detail">' + escapeHtml(res.detail) + '</div>' + controls + '</td>' +
+                '</tr>';
+        }).join('') || '<tr><td colspan="3">Nothing to show.</td></tr>';
+    }
+
     function switchTab(id, btn) {
         var contents = document.querySelectorAll('.tab-content');
         for (var i = 0; i < contents.length; i++) contents[i].className = "tab-content";
@@ -1450,6 +1784,7 @@ $htmlContent = @'
         btn.setAttribute('aria-selected', 'true');
 
         if(id === 'tab-simulator') { loadClusterSimulation(); }
+        if(id === 'tab-checklist') { refreshBrownfieldChecklist(); }
     }
 
     function toggleSimStrategy() {
@@ -1772,6 +2107,10 @@ $htmlContent = @'
             failureWarnDiv.style.display = 'none';
         }
 
+        // Brownfield checklist (tab 4) reads the same data: show the tab and re-evaluate its rules.
+        chkSnapshot = { failedHosts: parsed.failedHosts || [], failedVms: parsed.failedVms || [] };
+        document.getElementById('btn-tab-checklist').style.display = '';
+        refreshBrownfieldChecklist();
         document.getElementById('lblChecklistTitle').innerText = "Baseline Qualification Checklist (Raw Hardware - " + rangeLabel + "):";
 
         var activePct = globalDram > 0 ? ((globalActive / globalDram) * 100).toFixed(1) : 0;
