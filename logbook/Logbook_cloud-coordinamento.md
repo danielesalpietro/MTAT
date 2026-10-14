@@ -3,6 +3,17 @@
 Sessione cloud (claude.ai/code) di coordinamento. Etichetta `sessione:cloud-coordinamento`.
 Regole in `CLAUDE.md`. Voce più recente in alto.
 
+## 2026-10-14 13:40: #25: connect fallito presentato come "nessun cluster"
+- **Obiettivo**: segnalazione `locale-windows`: con l'account RO senza ruolo sull'inventario il
+  connect fallisce, ma la UI sbloccava la Fase 2 con "(no clusters found)".
+- **Fatto**: se falliscono tutti i vCenter richiesti e nessuna sessione precedente fornisce cluster,
+  la UI resta in Fase 1 con toast di errore per target e chip "failed" (cache precedente intatta).
+  Nuovo hint in `Add-KnownIssueHints` per "Permission ... denied ... System.View" (assegnare
+  Read-only sulla root dell'inventario con propagazione). Permesso mancante segnalato su #22.
+- **Verifiche**: stub con Connect-VIServer che lancia l'errore reale: `api/connect` restituisce
+  l'errore con hint; Playwright: toast error, scheda Baseline nascosta, Fase 1 attiva, 0 errori JS;
+  casi 0 e 2 cluster invariati. Docker in cloud si è fermato due volte (riavviato).
+
 ## 2026-10-14 13:30: scenario "assessment offline" (#26)
 - **Fatto**: recepita la decisione di Daniele (riportata da `locale-windows` in #26): oltre al
   self-assessment live, il fork serve il system integrator con import standalone completo

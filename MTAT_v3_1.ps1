@@ -207,6 +207,9 @@ function Get-FullExceptionText ($ErrorRecord) {
 # hint when the unwrapped exception text matches one of those known signatures, rather than leaving
 # the user to decode ".NET-speak" on their own.
 function Add-KnownIssueHints ($ExceptionText) {
+    if ($ExceptionText -match "Permission to perform this operation was denied" -and $ExceptionText -match "System\.View") {
+        return "$ExceptionText [Likely cause: the account authenticated but has no role on the vCenter inventory. Assign it at least the Read-only role on the vCenter root object (Hosts and Clusters, top level) with 'Propagate to children' enabled, then connect again.]"
+    }
     if ($ExceptionText -match "Sequence contains no elements") {
         return "$ExceptionText [Likely cause: installed VMware PowerCLI is older than this vCenter/ESXi build and doesn't recognize its API version -- common right after a vSphere upgrade, and Memory Tiering itself requires vSphere 8.0 Update 3+. Check with: Get-Module -ListAvailable VMware.PowerCLI. Fix with: Update-Module VMware.PowerCLI -Force, then restart MTAT.]"
     }
@@ -1529,6 +1532,20 @@ $htmlContent = @'
                     try {
                         var data = JSON.parse(xhr.responseText);
                         if (data.error) { showToast("vCenter Connection Error: " + data.error, 'error'); clearProgressChips('connectProgressChips'); return; }
+
+                        // Every requested vCenter failed (wrong password, missing permissions, unreachable)
+                        // and no earlier session supplies clusters either: stay on the connect step with
+                        // the per-target errors, rather than unlocking the analysis tabs with a misleading
+                        // "no clusters found" state. Checked before the cache reset below, so a failed
+                        // retry doesn't discard data from a previous good session.
+                        var failedCount = (data.failedTargets && data.failedTargets.length) ? data.failedTargets.length : 0;
+                        var returnedClusters = data.clusters ? (Array.isArray(data.clusters) ? data.clusters.length : 1) : 0;
+                        if (failedCount > 0 && failedCount >= servers.length && returnedClusters === 0) {
+                            var allFailedList = data.failedTargets.map(function(t) { return t.server + ": " + t.error; }).join("\n\n");
+                            showToast("Could not connect to any vCenter:\n\n" + allFailedList, 'error');
+                            for (var fs = 0; fs < servers.length; fs++) { setProgressChipState('connectProgressChips', fs, 'failed', servers[fs] + ' failed'); }
+                            return;
+                        }
 
                         // A (re)connect can point at an entirely different vCenter / server set than
                         // whatever was cached before -- clear it so a cluster name that happens to
