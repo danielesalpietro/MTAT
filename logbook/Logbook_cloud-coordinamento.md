@@ -3,6 +3,13 @@
 Sessione cloud (claude.ai/code) di coordinamento. Etichetta `sessione:cloud-coordinamento`.
 Regole in `CLAUDE.md`. Voce più recente in alto.
 
+## 2026-10-14 21:00: merge della PR #48 su main
+- **Fatto**: su richiesta di Daniele, merge di #48 (merge commit 8690bec, head 2f900f1, CI verde su
+  build-and-smoke-test e twin-e2e). Chiude #37. Branch di integrazione riallineato a `main`;
+  sottoscrizione e check-in rimossi.
+- **Aperto**: calibrazione del gemello su registrazioni reali (#47, `locale-windows`); lab 9.x (#44);
+  regola > 60 vCPU su 9.0 (#38); verifiche sul PC di #32/#35.
+
 ## 2026-10-14 20:45: gemello digitale (#47) e livelli di supporto per versione (#37)
 - **Obiettivo**: Daniele: il lab non è un collo di bottiglia, si valida MTAT su un gemello digitale;
   procedere con #37 dopo la conferma della GA 9.0 (confermata da `locale-windows`: RN VCF 9.0).
