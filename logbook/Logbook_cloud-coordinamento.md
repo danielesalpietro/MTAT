@@ -3,6 +3,17 @@
 Sessione cloud (claude.ai/code) di coordinamento. Etichetta `sessione:cloud-coordinamento`.
 Regole in `CLAUDE.md`. Voce più recente in alto.
 
+## 2026-10-14 12:45: verifica locale di #9, #21, #23 e build per #15
+- **Obiettivo**: confermare sul PC Windows le correzioni fatte in cloud.
+- **Fatto**: sessione rinominata "MTAT Supervisor"; titoli delle sessioni in `CLAUDE.md` (9986baf);
+  build per #15 affidata a `locale-windows` (lanciata dopo l'ok diretto di Daniele nella sua chat).
+- **Verifiche** (riportate da `locale-windows` sul build 9986baf): #23 fuso Europe/Rome e log in
+  ora locale; #21 banner headless; #9 POST senza Content-Length → 411, una riga WARN, 0 CRITICAL;
+  matrice #1 invariata; container healthy, 0 restart. CI verde su 2fb223c. Banner desktop
+  verificato solo in cloud (container stub), non sul PC.
+- **Aperto**: #15 attende l'accensione di `vc-lab-01` (#22, sessione esterna esxi-admin).
+  #9/#21/#23 si chiudono al merge su `main`.
+
 ## 2026-10-14 12:35: fuso orario nel container (#23)
 - **Obiettivo**: log del container nell'ora locale (segnalazione `locale-windows`).
 - **Fatto**: `tzdata` installato nel Dockerfile; controllo `TimeZoneInfo` nello smoke test CI.
