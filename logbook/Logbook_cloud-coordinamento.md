@@ -3,6 +3,14 @@
 Sessione cloud (claude.ai/code) di coordinamento. Etichetta `sessione:cloud-coordinamento`.
 Regole in `CLAUDE.md`. Voce più recente in alto.
 
+## 2026-10-14 19:55: requisiti Memory Tiering (#36)
+- **Fatto**: sub-issue #37–#42 di #36 (scelte di Daniele: 8.0 U3 = tech preview, regole raggruppate
+  per azione). La specifica dei requisiti `docs/vsphere-memory-tiering-requisiti.md` (scritta da
+  un'altra sessione locale dal PDF 9.1, pushata da `locale-windows` in 92eb082) resta invariata.
+  Aggiunta `docs/mtat-regole-memory-tiering.md`: per ogni requisito la regola MTAT (AUTO / CALC /
+  CHECK / NOTE), soglia, esito e issue; profili VM DRAM-only dalla §7.1. Riferimenti in `CLAUDE.md`.
+- **Aperto**: versione GA (#42), rilevamento in sola lettura per M-HW/M-VM, fonte passthrough/vGPU.
+
 ## 2026-10-14 19:40: merge della PR #27 su main
 - **Fatto**: su richiesta di Daniele, descrizione della PR aggiornata (#29, #30, #32, #35) e merge
   (merge commit 8d4a126, head 1034dbb, CI verde). Chiudono al merge: #9, #21, #23, #25, #30, #32, #35.
