@@ -20,13 +20,14 @@ sessione Claude (cloud o locale) che lavora sul repository.
 
 Ogni sessione ha un nome stabile, un'etichetta GitHub `sessione:<nome>` e un logbook.
 
-| Sessione | Etichetta | Dove gira | Si occupa di |
+| Sessione (titolo) | Etichetta | Dove gira | Si occupa di |
 |---|---|---|---|
-| Coordinamento | `sessione:cloud-coordinamento` | cloud (claude.ai/code) | codice, CI, issue, roadmap, coordinamento delle altre sessioni |
-| Validazione locale | `sessione:locale-windows` | PC Windows di Daniele (remote-control) | prove con accesso a vCenter/ESXi, Docker Desktop, verifiche sul campo, `assets.local.md` |
+| **MTAT Supervisor** (coordinamento) | `sessione:cloud-coordinamento` | cloud (claude.ai/code) | codice, CI, issue, roadmap, coordinamento delle altre sessioni |
+| **MTAT Locale - Developer** (validazione locale) | `sessione:locale-windows` | PC Windows di Daniele (remote-control) | prove con accesso a vCenter/ESXi, Docker Desktop, verifiche sul campo, `assets.local.md` |
 | ESXi Admin *(esterna)* | `sessione:esxi-admin` | altro progetto, fuori dal coordinamento | gestione del laboratorio vSphere: accensione/configurazione di vCenter ed ESXi, Memory Tiering sugli host |
 
-Una nuova sessione si aggiunge qui (nome, etichetta, ruolo) prima di ricevere lavoro.
+Una nuova sessione si aggiunge qui (titolo, etichetta, ruolo) prima di ricevere lavoro. Il titolo
+può cambiare, l'etichetta e il nome del logbook restano stabili.
 
 **Sessioni esterne** (es. ESXi Admin): lavorano su un altro progetto e non sono raggiungibili con
 i messaggi tra sessioni. Le issue con la loro etichetta descrivono cosa serve dal laboratorio
