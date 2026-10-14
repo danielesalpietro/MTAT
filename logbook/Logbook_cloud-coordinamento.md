@@ -3,6 +3,14 @@
 Sessione cloud (claude.ai/code) di coordinamento. Etichetta `sessione:cloud-coordinamento`.
 Regole in `CLAUDE.md`. Voce più recente in alto.
 
+## 2026-10-14 14:00: #25 verificata sul PC (94cd510)
+- **Verifiche** (da `locale-windows`, hash dello script nel container = checkout): password errata →
+  UI resta in Fase 1 con errore; account RO → "0 cluster(s) found", "(no clusters found)",
+  Analyze off, Import on; nessun altro WARN/ERROR/CRITICAL. Hint System.View presente nel codice,
+  non riverificato dal vero (ruolo ormai assegnato).
+- **Aperto**: #9, #21, #23, #25 verificate ma aperte fino al merge su `main` (proposta PR a Daniele).
+  #15 attende i blade nel cluster (#22).
+
 ## 2026-10-14 13:50: #25 caso "0 cluster" verificato su vCenter reale
 - **Verifiche** (da `locale-windows`, build c2700dd): ruolo Read-only assegnato a `mtat-ro`, connect
   RO riuscito, log "0 cluster(s) found", UI "(no clusters found)" e Analyze disabilitato.
