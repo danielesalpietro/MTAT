@@ -3,6 +3,13 @@
 Sessione cloud (claude.ai/code) di coordinamento. Etichetta `sessione:cloud-coordinamento`.
 Regole in `CLAUDE.md`. Voce più recente in alto.
 
+## 2026-10-14 13:50: #25 caso "0 cluster" verificato su vCenter reale
+- **Verifiche** (da `locale-windows`, build c2700dd): ruolo Read-only assegnato a `mtat-ro`, connect
+  RO riuscito, log "0 cluster(s) found", UI "(no clusters found)" e Analyze disabilitato.
+  Toast e Import attivo ancora da confermare.
+- **Aperto**: percorso "tutti i target falliti" (94cd510) non verificato sul PC: al prossimo build
+  con password errata. #15 riprende con i blade nel cluster.
+
 ## 2026-10-14 13:40: #25: connect fallito presentato come "nessun cluster"
 - **Obiettivo**: segnalazione `locale-windows`: con l'account RO senza ruolo sull'inventario il
   connect fallisce, ma la UI sbloccava la Fase 2 con "(no clusters found)".
