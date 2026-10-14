@@ -9,8 +9,32 @@ try {
     $global:HasConsole = $true
 } catch { }
 
+# --- HEADLESS / CONTAINER MODE ---------------------------------------------
+# Opt-in via environment variables (all unset = original desktop behavior, unchanged):
+#   MTAT_HEADLESS=1   no browser launch, no UI-heartbeat self-termination, log to stdout even
+#                     without an interactive console (so `docker logs` shows the engine output)
+#   MTAT_PORT=8600    fixed listen port instead of auto-discovery (a container needs a known port)
+#   MTAT_BIND_HOST=+  HttpListener host part; "+" listens on all interfaces (needed inside a
+#                     container so the published port is reachable). Default stays 127.0.0.1.
+#   MTAT_DATA_DIR     where the debug log / loading page are written (default: system temp dir)
+# The engine has NO authentication of its own: anyone who can reach the port can drive the
+# vCenter sessions it holds. Only expose it beyond localhost behind a trusted network/proxy.
+#   MTAT_ALLOWED_HOSTS  extra comma-separated hostnames the UI may be reached by (e.g. the
+#                     server's DNS name when published beyond localhost); localhost/127.0.0.1/[::1]
+#                     are always allowed. Any other Host header is rejected -- see the request guard.
+$global:Headless = ($env:MTAT_HEADLESS -in @('1', 'true', 'yes'))
+$bindHost = if ($env:MTAT_BIND_HOST) { $env:MTAT_BIND_HOST } else { "127.0.0.1" }
+# Entries are normalized to a bare hostname, so "mtat.lab.local:8600" works the same as "mtat.lab.local".
+$global:AllowedHosts = @('localhost', '127.0.0.1', '[::1]') + @(
+    "$env:MTAT_ALLOWED_HOSTS".Split(',') | Where-Object { $_.Trim() } |
+        ForEach-Object { try { ([Uri]"http://$($_.Trim())/").Host.ToLower() } catch { } }
+)
+
 function Write-Terminal($Message, $Color="White") {
-    if ($global:HasConsole -and ($Host.Name -notmatch "PS2EXE")) {
+    if ($global:Headless) {
+        Write-Host $Message
+    }
+    elseif ($global:HasConsole -and ($Host.Name -notmatch "PS2EXE")) {
         Write-Host $Message -ForegroundColor $Color
     }
 }
@@ -23,6 +47,11 @@ Write-Terminal "[*] Initializing core components... Please wait." "Yellow"
 
 $targetPort = 8600
 $portFound = $false
+$fixedPort = $false
+if ($env:MTAT_PORT) {
+    $targetPort = [int]$env:MTAT_PORT
+    $fixedPort = $true
+}
 
 while (-not $portFound) {
     if ($targetPort -gt 65500) {
@@ -35,6 +64,10 @@ while (-not $portFound) {
         $listenerTest.Stop()
         $portFound = $true
     } catch {
+        if ($fixedPort) {
+            Write-Terminal "FATAL: MTAT_PORT=$targetPort is already in use. Exiting." "Red"
+            exit 1
+        }
         Write-Terminal "[!] Port $targetPort is occupied. Trying next port..." "Yellow"
         $targetPort++
     }
@@ -43,7 +76,7 @@ while (-not $portFound) {
 # ==========================================
 # --- INSTANT LOADING SCREEN GENERATION ----
 # ==========================================
-$TempDir = [System.IO.Path]::GetTempPath()
+$TempDir = if ($env:MTAT_DATA_DIR) { $env:MTAT_DATA_DIR } else { [System.IO.Path]::GetTempPath() }
 $LoadingHtmlPath = Join-Path $TempDir "MTAT_Loading.html"
 $LogFilePath = Join-Path $TempDir "MTAT_debug_log.txt"
 
@@ -130,7 +163,10 @@ $loadingHtmlContent = @"
 $loadingHtmlContent | Out-File -FilePath $LoadingHtmlPath -Force -Encoding UTF8
 
 try {
-    if ($PSVersionTable.PSEdition -eq 'Core') {
+    if ($global:Headless) {
+        # No desktop/browser inside a container -- the user browses to the published port instead.
+    }
+    elseif ($PSVersionTable.PSEdition -eq 'Core') {
         if ($IsMacOS) { [void](Start-Process "open" -ArgumentList $LoadingHtmlPath -PassThru) }
         elseif ($IsLinux) { [void](Start-Process "xdg-open" -ArgumentList $LoadingHtmlPath -PassThru) }
         else { [void](Start-Process $LoadingHtmlPath -PassThru) }
@@ -171,6 +207,9 @@ function Get-FullExceptionText ($ErrorRecord) {
 # hint when the unwrapped exception text matches one of those known signatures, rather than leaving
 # the user to decode ".NET-speak" on their own.
 function Add-KnownIssueHints ($ExceptionText) {
+    if ($ExceptionText -match "Permission to perform this operation was denied" -and $ExceptionText -match "System\.View") {
+        return "$ExceptionText [Likely cause: the account authenticated but has no role on the vCenter inventory. Assign it at least the Read-only role on the vCenter root object (Hosts and Clusters, top level) with 'Propagate to children' enabled, then connect again.]"
+    }
     if ($ExceptionText -match "Sequence contains no elements") {
         return "$ExceptionText [Likely cause: installed VMware PowerCLI is older than this vCenter/ESXi build and doesn't recognize its API version -- common right after a vSphere upgrade, and Memory Tiering itself requires vSphere 8.0 Update 3+. Check with: Get-Module -ListAvailable VMware.PowerCLI. Fix with: Update-Module VMware.PowerCLI -Force, then restart MTAT.]"
     }
@@ -370,22 +409,27 @@ function Update-VersionCheckJobStatus {
 
 $url = "http://127.0.0.1:$targetPort/"
 $listener = New-Object System.Net.HttpListener
-$listener.Prefixes.Add($url)
+$listener.Prefixes.Add("http://$($bindHost):$targetPort/")
 
 try {
     $listener.Start()
     Write-DebugLog "[+] HTTP daemon bound to network port $targetPort successfully."
 } catch {
     Write-DebugLog "[-] CRITICAL: Port $targetPort bind failed. $(Get-FullExceptionText $_)"
-    exit
+    exit 1
 }
 
 Write-Terminal "===========================================================" "Cyan"
 Write-Terminal "[*] Engine is LIVE and ready!" "Green"
-Write-Terminal "[*] Launching MTAT interface in your default web browser..." "Green"
-Write-Terminal "    (If it does not open automatically, browse to: $url)" "Yellow"
-Write-Terminal "===========================================================" "Cyan"
-Write-Terminal "Please leave this window open while using the tool. Press Ctrl+C to exit." "DarkGray"
+if ($global:Headless) {
+    Write-Terminal "[*] Headless mode: listening on port $targetPort (bind host '$bindHost'). Browse to the published port, e.g. http://localhost:$targetPort/" "Green"
+    Write-Terminal "===========================================================" "Cyan"
+} else {
+    Write-Terminal "[*] Launching MTAT interface in your default web browser..." "Green"
+    Write-Terminal "    (If it does not open automatically, browse to: $url)" "Yellow"
+    Write-Terminal "===========================================================" "Cyan"
+    Write-Terminal "Please leave this window open while using the tool. Press Ctrl+C to exit." "DarkGray"
+}
 
 # ==========================================
 # --- LITERAL FRONT-END INTERFACE (HTML5) --
@@ -1489,6 +1533,20 @@ $htmlContent = @'
                         var data = JSON.parse(xhr.responseText);
                         if (data.error) { showToast("vCenter Connection Error: " + data.error, 'error'); clearProgressChips('connectProgressChips'); return; }
 
+                        // Every requested vCenter failed (wrong password, missing permissions, unreachable)
+                        // and no earlier session supplies clusters either: stay on the connect step with
+                        // the per-target errors, rather than unlocking the analysis tabs with a misleading
+                        // "no clusters found" state. Checked before the cache reset below, so a failed
+                        // retry doesn't discard data from a previous good session.
+                        var failedCount = (data.failedTargets && data.failedTargets.length) ? data.failedTargets.length : 0;
+                        var returnedClusters = data.clusters ? (Array.isArray(data.clusters) ? data.clusters.length : 1) : 0;
+                        if (failedCount > 0 && failedCount >= servers.length && returnedClusters === 0) {
+                            var allFailedList = data.failedTargets.map(function(t) { return t.server + ": " + t.error; }).join("\n\n");
+                            showToast("Could not connect to any vCenter:\n\n" + allFailedList, 'error');
+                            for (var fs = 0; fs < servers.length; fs++) { setProgressChipState('connectProgressChips', fs, 'failed', servers[fs] + ' failed'); }
+                            return;
+                        }
+
                         // A (re)connect can point at an entirely different vCenter / server set than
                         // whatever was cached before -- clear it so a cluster name that happens to
                         // match one from the previous session can't silently serve stale data from a
@@ -1509,7 +1567,20 @@ $htmlContent = @'
 
                         var cSelect = document.getElementById('clusterSelect'); cSelect.innerHTML = "";
                         var simSelect = document.getElementById('simClusterSelect'); simSelect.innerHTML = "";
-                        var cList = data.clusters; if (typeof cList === 'string') cList = [cList];
+                        var cList = data.clusters || []; if (!Array.isArray(cList)) cList = [cList];
+                        // Login can succeed against a vCenter that has no cluster objects at all (e.g. a
+                        // lab with only standalone hosts) -- say so explicitly instead of showing an
+                        // empty, unexplained Target Cluster menu. The tabs are still unlocked so the
+                        // offline import (Matrix CSV / History Bundle) stays reachable; only the live
+                        // cluster controls are disabled.
+                        var noClusters = (cList.length === 0);
+                        cSelect.disabled = noClusters; simSelect.disabled = noClusters;
+                        document.getElementById('analyzeBtn').disabled = noClusters;
+                        if (noClusters) {
+                            var emptyOpt = "<option value=''>(no clusters found)</option>";
+                            cSelect.innerHTML = emptyOpt; simSelect.innerHTML = emptyOpt;
+                            showToast("Connected, but no vSphere clusters were found on the connected vCenter(s).\n\nMTAT analyzes clusters only: standalone ESXi hosts that are not members of a cluster are not listed. Add the hosts to a cluster and connect again.\n\nOffline import (Matrix CSV / History Bundle) is still available in the Baseline tab.", 'warn');
+                        }
                         for (var i = 0; i < cList.length; i++) {
                             var optHtml = "<option value='" + escapeHtml(cList[i].Value) + "'>" + escapeHtml(cList[i].Text) + "</option>";
                             cSelect.innerHTML += optHtml;
@@ -1921,6 +1992,32 @@ $htmlContent = @'
         }
     }
 
+    // Greenfield "Sizing Rationale" text for the tiered option. Kept free of DOM access so it can be
+    // tested in isolation (#4). Workload hosts and HA nodes are explained separately: the old wording
+    // used the total (workload + HA) and picked a single limiting factor through an if/else chain, so
+    // a 1-host workload plus 1 HA node read "2 hosts because your CPU workload would overload fewer
+    // servers" at 0.9% CPU (#35).
+    function describeTieredSizing(f) {
+        var total = f.workloadHosts + f.haNodes;
+        var haText = f.haNodes > 0
+            ? " Plus " + f.haNodes + " HA node" + (f.haNodes > 1 ? "s" : "") + " for failover, " + total + " hosts in total."
+            : "";
+        if (Math.max(f.reqConsumed, f.reqCpu, f.reqActive) <= 1) {
+            return "The current workload (" + f.consumedGB + " GB consumed, " + f.activeGB + " GB active) fits on a single host: no capacity constraint requires more." + haText;
+        }
+        var reasons = [];
+        if (f.reqActive === f.workloadHosts) {
+            reasons.push("Active Memory (" + f.activeGB + " GB) must stay within 50% of each host's DRAM tier to protect performance; a larger Target Node Capacity (or a DRAM-heavier ratio) lowers this");
+        }
+        if (f.reqCpu === f.workloadHosts) {
+            reasons.push("the current CPU workload would push fewer servers above the 80% per-host cap; increase 'New Node CPU Capacity' if buying faster servers");
+        }
+        if (f.reqConsumed === f.workloadHosts) {
+            reasons.push("your VMs consume " + f.consumedGB + " GB of memory; a larger Target Node Capacity consolidates into fewer hosts");
+        }
+        return "The workload needs " + f.workloadHosts + " host" + (f.workloadHosts > 1 ? "s" : "") + " because " + reasons.join("; and ") + "." + haText;
+    }
+
     function runSimulationMath() {
         var strategy = document.getElementById('simStrategy') ? document.getElementById('simStrategy').value : 'brownfield';
         var hostCount = cachedHosts.length || 1;
@@ -2044,13 +2141,11 @@ $htmlContent = @'
                 if (tieredBase < 1) tieredBase = 1;
                 tieredReqHosts = tieredBase + haNodes;
 
-                if (tieredBase === reqActive && reqActive >= Math.max(reqConsumedTiered, reqCpu)) {
-                    limitingFactorMsg = "This extra host is intentional, not a miscalculation: Active Memory (" + globalActive + " GB) must stay within 50% of each host's DRAM tier to protect performance, so " + tieredReqHosts + " hosts are required here. A larger Target Node Capacity (or a DRAM-heavier ratio) closes this cost gap while keeping that same protection.";
-                } else if (tieredBase === reqCpu && reqCpu >= Math.max(reqConsumedTiered, reqActive)) {
-                    limitingFactorMsg = "You need " + tieredReqHosts + " total hosts because your current CPU workload would overload fewer servers (capped at 80% usage per host). Increase your 'New Node CPU Capacity' if buying faster servers.";
-                } else if (tieredBase === reqConsumedTiered) {
-                    limitingFactorMsg = "You need " + tieredReqHosts + " total hosts simply because your VMs are currently consuming " + globalConsumed + " GB of memory. To consolidate into fewer hosts, select a larger Target Node Capacity.";
-                }
+                limitingFactorMsg = describeTieredSizing({
+                    reqConsumed: reqConsumedTiered, reqCpu: reqCpu, reqActive: reqActive,
+                    workloadHosts: tieredBase, haNodes: haNodes,
+                    consumedGB: globalConsumed, activeGB: globalActive
+                });
 
                 if (partitionExceeded) {
                     partitionExceededMsg = "NVMe tier allocations are automatically capped at 4TB (4,096 GB) per host to align with vSphere maximum kernel limits. Your Tiered node's deliverable capacity was reduced to " + totalNodeMem + " GB instead of the requested " + requestedNodeCap + " GB. Option A (Standard Refresh) is unaffected, since it has no NVMe tier.";
@@ -3145,6 +3240,10 @@ while ($listener.IsListening) {
             Update-VersionCheckJobStatus
             $secondsSincePulse = ((Get-Date) - $lastHeartbeat).TotalSeconds
 
+            # In headless/container mode the engine is a long-running service shared by whoever
+            # browses to it, so a closed browser tab must not take it down.
+            if ($global:Headless) { continue }
+
             # Dead-Man's Switch: If UI is connected but drops pulse for 5 minutes (300s), exit cleanly
             if ($uiConnected -and $secondsSincePulse -gt 300) {
                 Write-DebugLog "[+] UI Heartbeat lost for 5 minutes. Safely shutting down engine."
@@ -3174,6 +3273,48 @@ while ($listener.IsListening) {
         $req = $context.Request
         $res = $context.Response
         $rawPath = $req.Url.LocalPath.ToLower().Trim('/')
+
+        # A body-carrying request with neither Content-Length nor chunked encoding (e.g. a bare
+        # `curl -X POST`) is answered with 411 by the managed HttpListener on Linux/macOS itself,
+        # which closes the response before handing us the context -- any write to $res would then
+        # throw ObjectDisposedException and get logged as a false [CRITICAL]. Browsers always send
+        # Content-Length (0 for an empty body), so this only affects ad-hoc clients.
+        if ($req.HttpMethod -notin @('GET', 'HEAD') -and -not $req.Headers['Content-Length'] -and $req.Headers['Transfer-Encoding'] -notmatch 'chunked') {
+            Write-DebugLog "[!] $($req.HttpMethod) /$rawPath without Content-Length -- answered 411 by the HTTP listener, ignored."
+            continue
+        }
+
+        # Request guard. A 127.0.0.1 listener prefix only accepts requests whose Host header is
+        # 127.0.0.1, but a wildcard prefix (MTAT_BIND_HOST=+, used in containers) accepts any Host --
+        # which re-opens DNS rebinding: a malicious page whose domain re-resolves to 127.0.0.1 would
+        # become same-origin with this engine and could drive the vCenter sessions it holds. So the
+        # Host header is checked explicitly against an allowlist. Separately, any browser page could
+        # fire a cross-site POST at the API (CSRF), so state-changing POSTs must come either from the
+        # engine's own UI or from a non-browser client (no Origin). "Own UI" means truly same-origin:
+        # Origin host AND port must equal the request's Host -- comparing hostnames alone would let any
+        # other web app on localhost (a dev server on :3000, another container) through.
+        $hostAuthority = try { ([Uri]"http://$($req.Headers['Host'])/").Authority.ToLower() } catch { "" }
+        $hostHeaderName = try { ([Uri]"http://$($req.Headers['Host'])/").Host.ToLower() } catch { "" }
+        $originHeader = $req.Headers['Origin']
+        $originAuthority = $null
+        if ($originHeader) {
+            $originAuthority = try { ([Uri]$originHeader).Authority.ToLower() } catch { "" }
+        }
+        $guardReason = $null
+        if ($hostHeaderName -notin $global:AllowedHosts) {
+            $guardReason = "Host header '$($req.Headers['Host'])' is not allowed (set MTAT_ALLOWED_HOSTS to add it)"
+        }
+        elseif ($req.HttpMethod -ne "GET" -and $originHeader -and ((-not $originAuthority) -or $originAuthority -ne $hostAuthority)) {
+            $guardReason = "cross-origin $($req.HttpMethod) from Origin '$originHeader' rejected"
+        }
+        if ($guardReason) {
+            Write-DebugLog "[!] Request to /$rawPath blocked: $guardReason."
+            $res.StatusCode = 403
+            $res.ContentType = "text/plain"
+            $res.ContentLength64 = 0
+            $res.Close()
+            continue
+        }
         
         if ($req.HttpMethod -eq "GET" -and ($rawPath -eq "" -or $rawPath -eq "index.html")) {
             $uiConnected = $true
@@ -3272,6 +3413,7 @@ while ($listener.IsListening) {
                 $clusterList = New-Object System.Collections.Generic.List[PSObject]
                 foreach ($server in $global:DefaultVIServers) {
                     $serverClusters = Get-Cluster -Server $server -ErrorAction SilentlyContinue
+                    Write-DebugLog "[connect] '$($server.Name)': $(($serverClusters | Measure-Object).Count) cluster(s) found."
                     foreach ($c in $serverClusters) {
                         $clusterList.Add([PSCustomObject]@{
                             Value = "$($server.Name)|$($c.Name)"
@@ -3508,10 +3650,21 @@ while ($listener.IsListening) {
                     # got silently overwritten by the Mem.TierNVMePct/100 fallback below.
                     $hostTierRatioReported = $false
                     if ($esxcliBudgetExceeded) {
-                        Write-DebugLog "[analyze] Skipping esxcli tiering-status query for host '$($h.Name)' -- per-host esxcli response time looked abnormal earlier this run; Tiering will show as 'Disabled' for this and any remaining host(s)."
+                        $hostIsTiered = "Unknown (not queried)"
+                        Write-DebugLog "[analyze] Skipping esxcli tiering-status query for host '$($h.Name)' -- per-host esxcli response time looked abnormal earlier this run; Tiering will show as 'Unknown (not queried)' for this and any remaining host(s)."
+                    } else {
+                    # Memory Tiering exists only on ESXi 8.0 Update 3 and later: on an older host "Disabled"
+                    # would wrongly suggest a feature that is available but switched off.
+                    $hostVersion = $null
+                    [void][version]::TryParse("$($h.Version)", [ref]$hostVersion)
+                    if ($null -ne $hostVersion -and $hostVersion -lt [version]"8.0.3") {
+                        $hostIsTiered = "Not supported (ESXi $($h.Version))"
                     } else {
                     try {
-                        $esxcli = Get-EsxCli -VMHost $h -V2 -ErrorAction SilentlyContinue
+                        # -ErrorAction Stop, not SilentlyContinue: a failed Get-EsxCli (missing privilege,
+                        # assembly load error) used to leave $esxcli empty and the host silently reported
+                        # as "Disabled". It now lands in the catch below as "Unknown (query failed)".
+                        $esxcli = Get-EsxCli -VMHost $h -V2 -ErrorAction Stop
                         if ($null -ne $esxcli.memtier) {
                             $status = $esxcli.memtier.status.get.Invoke()
                             if ($status.Status -match "Enabled") {
@@ -3523,8 +3676,12 @@ while ($listener.IsListening) {
                             if (($esxcli.system.settings.kernel.list.Invoke() | Where-Object { $_.Name -eq "MemoryTiering" }).Runtime -match "TRUE") {
                                 $hostIsTiered = "Enabled"
                             }
+                        } else {
+                            $hostIsTiered = "Unknown (no esxcli tiering namespace)"
+                            Write-DebugLog "[analyze] WARNING: host '$($h.Name)' (ESXi $($h.Version)) exposes neither 'memtier' nor 'system settings kernel' through esxcli -- Tiering shown as '$hostIsTiered'."
                         }
                     } catch {
+                        if ($hostIsTiered -ne "Enabled") { $hostIsTiered = "Unknown (query failed)" }
                         # $hostIsTiered may already be "Enabled" here if the failure happened AFTER
                         # that was set (e.g. casting $status.Ratio/$status.Percentage to [int] below
                         # it) -- log what will actually be shown, not an assumption that it's always
@@ -3540,6 +3697,7 @@ while ($listener.IsListening) {
                     if (-not $esxcliBudgetExceeded -and ($esxcliAvgLooksAbnormal -or $esxcliHitHardCeiling)) {
                         $esxcliBudgetExceeded = $true
                         Write-DebugLog "[analyze] WARNING: esxcli tiering-status queries are averaging $([math]::Round($esxcliAvgSecondsPerHost, 1))s/host across $esxcliCallCount host(s) so far (hard ceiling hit: $esxcliHitHardCeiling) -- this looks like genuinely abnormal esxcli behavior, not just a large cluster, so remaining host(s) this run will skip it and show 'Disabled' rather than wait indefinitely."
+                    }
                     }
                     }
 
@@ -3666,6 +3824,7 @@ while ($listener.IsListening) {
                         HostName     = $currentHostName; Tiering = $hostIsTiered; TierRatioPct = $hostTierRatioPct; CPU_Pct = [math]::Round($hostCpuPct, 1)
                         Physical_RAM = $hostDramGB; Consumed_GB = $hostConsumedMemGB; Active_GB = $hostActiveGB; Active_Pct = if($hostDramGB -gt 0){[math]::Round(($hostActiveGB/$hostDramGB)*100,1)}else{0}
                     })
+                    Write-DebugLog "[analyze] Host '$currentHostName': Tiering='$hostIsTiered' (ratio $hostTierRatioPct%), DRAM $hostDramGB GB, consumed $hostConsumedMemGB GB, active $hostActiveGB GB, $(@($hostVMs).Count) powered-on VM(s)."
                   } catch {
                     $failedHostNames.Add($h.Name)
                     Write-DebugLog "[analyze] ERROR: host '$($h.Name)' failed entirely and was excluded from cluster totals (still listed below as 'ERROR'): $(Get-FullExceptionText $_)"
@@ -3676,6 +3835,17 @@ while ($listener.IsListening) {
                   }
                 }
 
+                # VMs are attributed to hosts by name ($_.VMHost.Name, per-host loop above). If PowerCLI
+                # returns incomplete objects (e.g. an inconsistent mix of PowerCLI module versions --
+                # seen live: every VMHost came back empty) none of them match, and the cluster silently
+                # reports "0 VM(s)". Surface every powered-on VM that no host claimed instead.
+                $clusterHostNames = @($hosts | ForEach-Object { $_.Name })
+                $unattributedVms = @($allVMs | Where-Object { $_.VMHost.Name -notin $clusterHostNames })
+                if ($unattributedVms.Count -gt 0) {
+                    Write-DebugLog "[analyze] WARNING: $($unattributedVms.Count) of $($allVMs.Count) powered-on VM(s) in cluster '$clusterName' could not be attributed to any host of the cluster (empty or unknown VMHost) and are missing from the results. This usually means PowerCLI returned incomplete object data -- check that all installed VMware.* modules come from the same PowerCLI release."
+                    foreach ($uvm in $unattributedVms) { $failedVmNames.Add("$($uvm.Name) (no host)") }
+                }
+
                 if ($failedHostNames.Count -gt 0 -or $failedVmNames.Count -gt 0) {
                     Write-DebugLog "[analyze] Completed with $($failedHostNames.Count) failed host(s) [$($failedHostNames -join ', ')] and $($failedVmNames.Count) failed VM(s) [$($failedVmNames -join ', ')] excluded from results."
                 } else {
@@ -3683,8 +3853,10 @@ while ($listener.IsListening) {
                 }
 
                 Send-JsonResponse -Response $res -Object @{
-                    dram = $totalDramGB_Sum; consumed = [math]::Round($totalConsumedMemGB_Sum); active = [math]::Round($totalActiveGB)
-                    activeAvg = [math]::Round($totalActiveGB_Avg)
+                    # 2 decimals, like the per-host values: whole-GB rounding turned e.g. 0.1 GB active on a
+                    # small cluster into 0 and the cluster-level percentages into 0.0%.
+                    dram = $totalDramGB_Sum; consumed = [math]::Round($totalConsumedMemGB_Sum, 2); active = [math]::Round($totalActiveGB, 2)
+                    activeAvg = [math]::Round($totalActiveGB_Avg, 2)
                     cpu = if ($totalCpuMhz_Sum -gt 0) { [math]::Round(($totalCpuUsageMhz_Sum / $totalCpuMhz_Sum) * 100, 1) } else { 0 }
                     hosts = $hostResults; vms = @($vmResults | Sort-Object Active_Pct -Descending)
                     failedHosts = @($failedHostNames); failedVms = @($failedVmNames)
@@ -3701,6 +3873,12 @@ while ($listener.IsListening) {
         }
     } catch {
         $fatalText = Add-KnownIssueHints (Get-FullExceptionText $_)
+        if ($fatalText -match 'Cannot access a disposed object') {
+            # The response was already closed (client went away, or the listener answered on its
+            # own) -- nothing left to send, and not an engine failure.
+            Write-DebugLog "[!] Response for /$rawPath was already closed before the engine could answer (non-fatal): $fatalText"
+            continue
+        }
         Write-DebugLog "[CRITICAL] Outermost loop routing failure occurred: $fatalText"
         if ($null -ne $context -and $null -ne $context.Response) {
             Send-JsonResponse -Response $context.Response -Object @{ error = $fatalText }

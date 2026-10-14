@@ -1,0 +1,54 @@
+name: Docker image
+
+on:
+  push:
+    branches: [main, "claude/**"]
+    tags: ["v*"]
+    paths: ["MTAT_v3_1.ps1", "docker/**", "tests/**", "docker-compose.yml", ".dockerignore", ".github/workflows/docker-image.yml"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/mtat
+
+jobs:
+  build-and-smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sizing unit tests
+        run: node tests/sizing.test.js
+
+      # Real build: installs PowerCLI from PSGallery (the part that can't be faked).
+      - name: Build image
+        run: docker compose build
+
+      - name: Smoke test (engine up, UI served, PowerCLI detected)
+        run: |
+          docker compose up -d
+          curl -sf -o /dev/null --retry 30 --retry-all-errors --retry-delay 2 http://127.0.0.1:8600/api/ping
+          curl -sf http://127.0.0.1:8600/ | grep -q "Memory Tiering Assessment Tool"
+          curl -sf http://127.0.0.1:8600/api/get-version-info | tee /dev/stderr | grep -vq '"CurrentPowerCli":"Unknown"'
+          # TZ from docker-compose.yml (default Europe/Rome) must be honoured -- needs tzdata in the image.
+          test "$(docker compose exec -T mtat pwsh -NoProfile -Command '[TimeZoneInfo]::Local.Id')" = "Europe/Rome"
+          # Headless mode must not self-terminate when no browser connects (desktop mode does after 60s).
+          sleep 75
+          curl -sf -o /dev/null http://127.0.0.1:8600/api/ping
+          docker compose logs
+
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Push to GHCR
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          TAG=$([[ "$GITHUB_REF" == refs/tags/* ]] && echo "${GITHUB_REF_NAME#v}" || echo "3.1-beta")
+          docker tag mtat:3.1-beta "$IMAGE:$TAG"
+          docker push "$IMAGE:$TAG"

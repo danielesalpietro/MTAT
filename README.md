@@ -10,6 +10,17 @@ This repository provides a PowerShell file and an executable (Windows). The Powe
 
 ---
 
+## 🐳 Docker (beta)
+
+Run the engine headless in a Linux container (PowerShell 7 + PowerCLI preinstalled):
+
+```bash
+docker compose up -d --build
+# then browse to http://localhost:8600
+```
+
+Details, security notes and configuration: [`docker/README.md`](docker/README.md). Platform evolution plan: [`docs/ROADMAP.md`](docs/ROADMAP.md).
+
 ## ✅ Requirements
 
 ### Software & Environment Requirements

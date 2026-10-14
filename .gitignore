@@ -1,0 +1,7 @@
+# Inventario reale dei sistemi e segreti: solo in locale (vedi assets.md, CLAUDE.md)
+assets.local.md
+.mtat/
+secrets/
+*.secret
+*.password
+.env
