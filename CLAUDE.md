@@ -14,6 +14,7 @@ sessione Claude (cloud o locale) che lavora sul repository.
 | `.github/workflows/` | CI (build immagine reale + smoke test) |
 | `docs/ROADMAP.md` | fasi di evoluzione della piattaforma |
 | `logbook/Logbook_<sessione>.md` | diario di lavoro, uno per sessione |
+| `assets.md` | formato e regole dell'inventario dei sistemi; i dati reali sono in `assets.local.md` (non versionato) |
 
 ## Sessioni e responsabilità
 
@@ -75,6 +76,11 @@ Una nuova sessione si aggiunge qui (nome, etichetta, ruolo) prima di ricevere la
 - La CI `Docker image` deve risultare verde sul commit.
 
 ## Sicurezza e permessi
+
+- Inventario sistemi: in issue, logbook e commit si usa solo l'**alias** (`vc-lab-01`). Hostname,
+  IP e utenti reali stanno in `assets.local.md` sul PC di Daniele (gitignored); le password in file
+  locali referenziati per percorso, che le sessioni **non leggono né stampano**.
+  Chi usa un sistema nuovo aggiorna `assets.local.md` (sessione locale) o chiede di farlo.
 
 - Le credenziali vCenter le inserisce **solo Daniele** dalla UI. Nessuna sessione le chiede in
   chat, le salva su file o le passa ad altre sessioni.
