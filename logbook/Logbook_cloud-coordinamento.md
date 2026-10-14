@@ -3,6 +3,18 @@
 Sessione cloud (claude.ai/code) di coordinamento. Etichetta `sessione:cloud-coordinamento`.
 Regole in `CLAUDE.md`. Voce più recente in alto.
 
+## 2026-10-14 19:00: #30 terza iterazione: solo la chiusura di VMware.VimAutomation.Core
+- **Obiettivo**: CI rossa su d795131 (dipendenza senza versione in StorageUtility) e 5519f4c
+  (`VMware.Sdk.vSphere.vCenter.CertManagement` 1.0.0.0 non installabile da PSGallery): il meta
+  completo trascina decine di SDK che MTAT non usa.
+- **Fatto** (proposta 2 di `locale-windows`): `install-powercli.ps1` scarica solo il manifest di
+  VMware.PowerCLI per le versioni, installa soltanto Core e le sue dipendenze a quelle versioni
+  (`-SkipDependencyCheck`), scrive `powercli-pins.json`; `verify-powercli.ps1` controlla il set
+  rispetto ai pin, fa `Import-Module` di Core e prova a caricare `VMware.System.Private.ServiceModel`.
+- **Verifiche**: repo PSResource finto (esche 13.5.1/9.1, modulo fuori dalla catena, requisito senza
+  versione): installati solo i 4 moduli della catena, gate ok, Import-Module ok. Il test ha trovato un
+  errore di parsing nello script (`$PowerCliVersion:`), corretto prima del push. PSGallery reale → CI.
+
 ## 2026-10-14 18:55: #30 seconda correzione (CI rossa su 8b4fc92)
 - **Obiettivo**: la CI ha confermato il gate: anche il meta-modulo VMware.PowerCLI 13.3 installato
   con `Install-Module` porta dipendenze transitive all'ultima versione (`VMware.Vcf.Sso` 13.5.1).

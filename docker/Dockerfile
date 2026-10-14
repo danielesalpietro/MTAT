@@ -4,9 +4,10 @@
 ARG PWSH_IMAGE=mcr.microsoft.com/powershell:7.4-ubuntu-22.04
 FROM ${PWSH_IMAGE}
 
-# Pinned for reproducible builds; bump deliberately. The whole VMware.PowerCLI module tree is
-# installed at the exact versions its manifests name (docker/install-powercli.ps1): letting the
-# gallery resolve dependencies mixed incompatible PowerCLI releases (#30).
+# Pinned for reproducible builds; bump deliberately. Only VMware.VimAutomation.Core and its
+# dependencies are installed, at the exact versions the VMware.PowerCLI manifest pins
+# (docker/install-powercli.ps1): letting the gallery resolve dependencies mixed incompatible
+# PowerCLI releases (#30).
 ARG POWERCLI_VERSION=13.3.0.24145081
 # Set to 1 only for offline smoke tests of the container itself (see docker/README.md).
 ARG SKIP_POWERCLI=0
@@ -31,7 +32,7 @@ RUN update-ca-certificates \
 COPY docker/install-powercli.ps1 docker/verify-powercli.ps1 /opt/mtat-build/
 RUN if [ "$SKIP_POWERCLI" != "1" ]; then \
       pwsh -NoLogo -NoProfile -File /opt/mtat-build/install-powercli.ps1 -PowerCliVersion $POWERCLI_VERSION \
-   && pwsh -NoLogo -NoProfile -File /opt/mtat-build/verify-powercli.ps1 -ExpectedPowerCliVersion $POWERCLI_VERSION \
+   && pwsh -NoLogo -NoProfile -File /opt/mtat-build/verify-powercli.ps1 \
    && pwsh -NoLogo -NoProfile -Command "Set-PowerCLIConfiguration -Scope AllUsers -ParticipateInCEIP \$false -Confirm:\$false | Out-Null" ; \
     fi
 

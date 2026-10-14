@@ -70,7 +70,7 @@ Copiare i certificati root (`*.crt`, formato PEM) in `docker/certs/` e ricostrui
 | Build arg | Default | Note |
 |---|---|---|
 | `PWSH_IMAGE` | `mcr.microsoft.com/powershell:7.4-ubuntu-22.04` | PowerShell 7.4 LTS |
-| `POWERCLI_VERSION` | `13.3.0.24145081` | versione del meta-modulo `VMware.PowerCLI`, che fissa tutti i sottomoduli; la build fallisce se le versioni installate non sono coerenti (`docker/verify-powercli.ps1`) |
+| `POWERCLI_VERSION` | `13.3.0.24145081` | release PowerCLI di riferimento: si installa solo `VMware.VimAutomation.Core` con le sue dipendenze, alle versioni esatte fissate dal manifest di `VMware.PowerCLI` (`docker/install-powercli.ps1`); la build fallisce se l'insieme installato non è coerente (`docker/verify-powercli.ps1`) |
 | `SKIP_POWERCLI` | `0` | `1` solo per smoke test offline: senza PowerCLI il motore si chiude all'avvio |
 
 ## CI
