@@ -3,6 +3,32 @@
 Sessione cloud (claude.ai/code) di coordinamento. Etichetta `sessione:cloud-coordinamento`.
 Regole in `CLAUDE.md`. Voce più recente in alto.
 
+## 2026-10-14 22:40: soglie Active per host e VM (#38) e nuova issue #50
+- **Obiettivo**: implementare M-WL-01…03 (picco active ≤ 50% DRAM per host, active medio della VM
+  nella sua quota DRAM, domanda delle VM ≤ DRAM dell'host).
+- **Fatto**:
+  - motore: campi host `Active_Check`, `VM_Demand_GB`, `VM_Demand_Check`; campi VM `Active_Avg_GB`,
+    `DRAM_Share_GB`, `DRAM_Fit`. Quota DRAM = memoria × 100 / (100 + ratio), con il ratio reale se il
+    tiering è attivo, altrimenti 1:1. Log WARNING per ogni host o VM oltre soglia;
+  - UI: colonne nelle tabelle, export CSV (colonne in coda), import che le preserva, riquadro nella
+    checklist con gli host e le VM a rischio;
+  - gemello `mixed-90`: `vm-twin-hot` (WARN M-WL-02), picco 60% su `esxi-twin-90-off` (WARN M-WL-01),
+    VM pinned da 600 GB su `esxi-twin-90-err` (WARN M-WL-03); regole v0.6;
+  - aperta #50 (nuovo scenario di rightsizing CPU/RAM delle VM, nome da definire), sub-issue di #14.
+- **Verifiche**:
+  - `node tests/sizing.test.js` → ALL OK;
+  - build con `Dockerfile.noapt` e `SKIP_POWERCLI=1`, `twin-e2e` su `mixed-90`, `lab-802` e
+    `no-clusters` → ALL OK;
+  - Playwright su `mixed-90` Real-Time: colonne e riquadro dei rischi corretti, nessun errore JS.
+- **Aperto**: CI sul push; verifica sul PC di Daniele. Altri profili DRAM-only (Low Latency, FT…)
+  da rilevare (#42).
+
+## 2026-10-14 21:25: merge della PR #49 su main
+- **Fatto**: su richiesta di Daniele, merge di #49 (0f6b601, head 05f4764, CI verde): regola > 60 vCPU
+  su ESX 9.0 (#38, che resta aperta per le soglie Active). Branch riallineato a `main`; sottoscrizione
+  e check-in rimossi. Gemello avviato da Daniele sul PC (`mixed-90`): valori della checklist
+  ricalcolati a mano e coerenti con lo scenario.
+
 ## 2026-10-14 21:20: regola > 60 vCPU su ESX 9.0 (#38)
 - **Fatto**: `Get-VmTieringNotes` (fonte: RN VCF 9.0 Known Issues): VM > 60 vCPU su host 9.0.x →
   nota in `Tiering_Notes` + WARN nel log; nuove colonne `vCPU` e `Tiering_Notes` (tabella VM, due export

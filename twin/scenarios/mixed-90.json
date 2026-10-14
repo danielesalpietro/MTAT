@@ -1,6 +1,6 @@
 {
   "name": "mixed-90",
-  "description": "One vCenter 9.0 with a mixed cluster: ESXi 8.0.3 with tiering on (tech preview), 9.0 with tiering on via the legacy kernel setting and Mem.TierNVMePct=50, 9.0 with memtier disabled, 9.0 whose esxcli fails, an 8.0.2 host, DRAM-only VMs, an unresolvable VM, and historical stats at level 2. Two 64-vCPU VMs: on ESX 9.0 (known issue note expected) and on 8.0.3 (no note).",
+  "description": "One vCenter 9.0 with a mixed cluster: ESXi 8.0.3 with tiering on (tech preview), 9.0 with tiering on via the legacy kernel setting and Mem.TierNVMePct=50, 9.0 with memtier disabled, 9.0 whose esxcli fails, an 8.0.2 host, DRAM-only VMs, an unresolvable VM, and historical stats at level 2. Two 64-vCPU VMs: on ESX 9.0 (known issue note expected) and on 8.0.3 (no note). Active-memory thresholds (#38): vm-twin-hot exceeds its DRAM share, esxi-twin-90-off peaks at 60% active in the historical ranges, and the 600 GB pinned VM pushes esxi-twin-90-err's VM demand above DRAM.",
   "vcenters": [
     {
       "name": "vc-twin-90",
@@ -114,6 +114,20 @@
                       "peak": 20
                     }
                   }
+                },
+                {
+                  "name": "vm-twin-hot",
+                  "memoryGB": 32,
+                  "vcpu": 4,
+                  "realtime": {
+                    "activeMB": 22938
+                  },
+                  "stats": {
+                    "activePct": {
+                      "avg": 70,
+                      "peak": 80
+                    }
+                  }
                 }
               ]
             },
@@ -210,7 +224,7 @@
                 },
                 "activePctOfDram": {
                   "avg": 5,
-                  "peak": 12
+                  "peak": 60
                 },
                 "consumedPctOfDram": {
                   "avg": 30,
@@ -271,7 +285,23 @@
                   "peak": 25
                 }
               },
-              "vms": []
+              "vms": [
+                {
+                  "name": "vm-twin-bigpinned",
+                  "memoryGB": 600,
+                  "vcpu": 8,
+                  "pinned": true,
+                  "realtime": {
+                    "activeMB": 61440
+                  },
+                  "stats": {
+                    "activePct": {
+                      "avg": 10,
+                      "peak": 12
+                    }
+                  }
+                }
+              ]
             },
             {
               "name": "esxi-twin-802",
@@ -329,13 +359,15 @@
         "cluster": "vc-twin-90|cl-twin-mixed",
         "range": "Real-Time Snapshot",
         "dram": 2560,
-        "vmCount": 6,
+        "vmCount": 8,
         "failedVms": 1,
         "hosts": {
           "esxi-twin-803": {
             "Tiering": "Enabled",
             "TierRatioPct": 100,
-            "TieringSupport": "Tech preview"
+            "TieringSupport": "Tech preview",
+            "Active_Check": "PASS",
+            "VM_Demand_Check": "PASS"
           },
           "esxi-twin-90-legacy": {
             "Tiering": "Enabled",
@@ -344,11 +376,15 @@
           },
           "esxi-twin-90-off": {
             "Tiering": "Disabled",
-            "TieringSupport": "Supported"
+            "TieringSupport": "Supported",
+            "Active_Check": "PASS",
+            "VM_Demand_Check": "PASS"
           },
           "esxi-twin-90-err": {
             "Tiering": "Unknown (query failed)",
-            "TieringSupport": "Supported"
+            "TieringSupport": "Supported",
+            "Active_Check": "PASS",
+            "VM_Demand_Check": "WARN"
           },
           "esxi-twin-802": {
             "Tiering": "Not supported (ESXi 8.0.2)",
@@ -358,7 +394,9 @@
         "vms": {
           "vm-twin-wide-90": {
             "vCPU": 64,
-            "Tiering_Notes": "> 60 vCPU on ESX 9.0: may fail to power on with Memory Tiering (known issue; workaround Mem.VMOverheadGrowthLimit = 3)"
+            "Tiering_Notes": "> 60 vCPU on ESX 9.0: may fail to power on with Memory Tiering (known issue; workaround Mem.VMOverheadGrowthLimit = 3)",
+            "DRAM_Share_GB": 128,
+            "DRAM_Fit": "PASS"
           },
           "vm-twin-wide-803": {
             "vCPU": 64,
@@ -366,7 +404,27 @@
           },
           "vm-twin-app-1": {
             "vCPU": 16,
-            "Tiering_Notes": ""
+            "Tiering_Notes": "",
+            "DRAM_Share_GB": 64,
+            "DRAM_Fit": "PASS"
+          },
+          "vm-twin-hot": {
+            "DRAM_Share_GB": 16,
+            "DRAM_Fit": "WARN"
+          },
+          "vm-twin-pinned": {
+            "DRAM_Share_GB": 64,
+            "DRAM_Fit": "DRAM-only"
+          },
+          "vm-twin-notier": {
+            "DRAM_Fit": "DRAM-only"
+          },
+          "vm-twin-lowlat": {
+            "DRAM_Share_GB": 10.67,
+            "DRAM_Fit": "PASS"
+          },
+          "vm-twin-bigpinned": {
+            "DRAM_Fit": "DRAM-only"
           }
         }
       },
@@ -374,7 +432,7 @@
         "cluster": "vc-twin-90|cl-twin-mixed",
         "range": "Past 7 Days",
         "dram": 2560,
-        "vmCount": 6,
+        "vmCount": 8,
         "failedVms": 1,
         "hostsNumeric": {
           "esxi-twin-803": {
@@ -386,6 +444,28 @@
             "CPU_Pct": 20,
             "Active_GB": 102.4,
             "Consumed_GB": 256
+          },
+          "esxi-twin-90-off": {
+            "Active_GB": 307.2
+          }
+        },
+        "hosts": {
+          "esxi-twin-803": {
+            "Active_Check": "PASS"
+          },
+          "esxi-twin-90-off": {
+            "Active_Check": "WARN"
+          },
+          "esxi-twin-90-err": {
+            "VM_Demand_Check": "WARN"
+          }
+        },
+        "vms": {
+          "vm-twin-hot": {
+            "DRAM_Fit": "WARN"
+          },
+          "vm-twin-app-1": {
+            "DRAM_Fit": "PASS"
           }
         }
       }
