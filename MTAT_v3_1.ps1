@@ -206,6 +206,18 @@ function Get-FullExceptionText ($ErrorRecord) {
 # Some PowerCLI failures are cryptic but have a well-known root cause. Appends a short, actionable
 # hint when the unwrapped exception text matches one of those known signatures, rather than leaving
 # the user to decode ".NET-speak" on their own.
+# Memory Tiering support level for an ESX host or vCenter version (#37). Sources: release notes
+# vSphere 8.0 U3 / KB 95944 (tech preview), release notes VCF 9.0 (build 24755599, GA), vSphere 9.x
+# documentation. Kept separate from the "Tiering" state (Enabled/Disabled/...) on purpose: sizing
+# keys off Tiering === "Enabled", while this answers "may this host run it in production".
+function Get-TieringSupportLevel ($VersionString) {
+    $v = $null
+    if (-not [version]::TryParse("$VersionString", [ref]$v)) { return "Unknown" }
+    if ($v -lt [version]"8.0.3") { return "Not supported" }
+    if ($v -lt [version]"9.0") { return "Tech preview" }
+    return "Supported"
+}
+
 function Add-KnownIssueHints ($ExceptionText) {
     if ($ExceptionText -match "Permission to perform this operation was denied" -and $ExceptionText -match "System\.View") {
         return "$ExceptionText [Likely cause: the account authenticated but has no role on the vCenter inventory. Assign it at least the Read-only role on the vCenter root object (Hosts and Clusters, top level) with 'Propagate to children' enabled, then connect again.]"
@@ -893,6 +905,7 @@ $htmlContent = @'
                         <th class="sortable" data-type="text" onclick="sortTableByHeader(this)">Cluster<span class="sort-arrow"></span></th>
                         <th class="sortable" data-type="text" onclick="sortTableByHeader(this)">HostName<span class="sort-arrow"></span></th>
                         <th class="sortable" data-type="text" onclick="sortTableByHeader(this)">Tiering<span class="sort-arrow"></span></th>
+                        <th class="sortable" data-type="text" onclick="sortTableByHeader(this)" title="Memory Tiering support for this ESX version: Not supported (&lt; 8.0 U3), Tech preview (8.0 U3), Supported (9.0+)">Support<span class="sort-arrow"></span></th>
                         <th class="sortable" data-type="num" onclick="sortTableByHeader(this)">CPU_Pct<span class="sort-arrow"></span></th>
                         <th class="sortable" data-type="num" onclick="sortTableByHeader(this)">Physical_RAM (GB)<span class="sort-arrow"></span></th>
                         <th class="sortable" data-type="num" onclick="sortTableByHeader(this)">Consumed_GB<span class="sort-arrow"></span></th>
@@ -1780,7 +1793,7 @@ $htmlContent = @'
             // Cluster/HostName/Tiering can originate from a live vCenter object name OR an offline
             // CSV import (an arbitrary file picked from disk) -- escaped like every other dynamic
             // value in this function, rather than trusted as always-safe plain text.
-            hBody.innerHTML += "<tr" + rowStyle + "><td>" + escapeHtml(h.Cluster) + "</td><td>" + escapeHtml(h.HostName) + "</td><td>" + escapeHtml(h.Tiering) + "</td><td>" + h.CPU_Pct + "%</td><td>" + h.Physical_RAM + "</td><td>" + h.Consumed_GB + "</td><td>" + h.Active_GB + "</td><td>" + h.Active_Pct + "%</td></tr>";
+            hBody.innerHTML += "<tr" + rowStyle + "><td>" + escapeHtml(h.Cluster) + "</td><td>" + escapeHtml(h.HostName) + "</td><td>" + escapeHtml(h.Tiering) + "</td><td>" + escapeHtml(h.TieringSupport || "Unknown") + "</td><td>" + h.CPU_Pct + "%</td><td>" + h.Physical_RAM + "</td><td>" + h.Consumed_GB + "</td><td>" + h.Active_GB + "</td><td>" + h.Active_Pct + "%</td></tr>";
         }
 
         var vBody = document.querySelector('#vmTable tbody'); vBody.innerHTML = "";
@@ -2509,9 +2522,9 @@ $htmlContent = @'
             return csv;
         }
         if (type === 'hosts') {
-            csv = "Cluster,HostName,Tiering,CPU_Pct,Physical_RAM,Consumed_GB,Active_GB,Active_Pct\r\n";
+            csv = "Cluster,HostName,Tiering,CPU_Pct,Physical_RAM,Consumed_GB,Active_GB,Active_Pct,TieringSupport\r\n";
             for (var j = 0; j < cachedHosts.length; j++) {
-                var h = cachedHosts[j]; csv += csvField(h.Cluster) + "," + csvField(h.HostName) + "," + csvField(h.Tiering) + "," + h.CPU_Pct + "," + h.Physical_RAM + "," + h.Consumed_GB + "," + h.Active_GB + "," + h.Active_Pct + "\r\n";
+                var h = cachedHosts[j]; csv += csvField(h.Cluster) + "," + csvField(h.HostName) + "," + csvField(h.Tiering) + "," + h.CPU_Pct + "," + h.Physical_RAM + "," + h.Consumed_GB + "," + h.Active_GB + "," + h.Active_Pct + "," + csvField(h.TieringSupport || "Unknown") + "\r\n";
             }
             return csv;
         }
@@ -2544,7 +2557,7 @@ $htmlContent = @'
         // can be ambiguous, not just one. ClusterContext is still included alongside for
         // readability when the CSV is opened directly, and as a fallback when re-importing an older
         // exported file that predates these two columns.
-        var globalHostCsv = "Cluster,RangeName,ClusterContext,HostName,Tiering,CPU_Pct,Physical_RAM,Consumed_GB,Active_GB,Active_Pct\r\n";
+        var globalHostCsv = "Cluster,RangeName,ClusterContext,HostName,Tiering,CPU_Pct,Physical_RAM,Consumed_GB,Active_GB,Active_Pct,TieringSupport\r\n";
         var globalVmCsv = "Cluster,RangeName,ClusterContext,Host,VMName,Provisioned_GB,Active_GB,Active_Pct,Pinned_Memory,Pages_1GB,Pages_2MB\r\n";
 
         for (var clusterKey in clusterSessionCache) {
@@ -2557,7 +2570,7 @@ $htmlContent = @'
                 var clusterContext = csvField(cName + " (" + rName + ")");
                 var hArr = dataObj.hosts || [];
                 for (var x = 0; x < hArr.length; x++) {
-                    var h = hArr[x]; globalHostCsv += safeCluster + "," + safeRange + "," + clusterContext + "," + csvField(h.HostName) + "," + csvField(h.Tiering) + "," + h.CPU_Pct + "," + h.Physical_RAM + "," + h.Consumed_GB + "," + h.Active_GB + "," + h.Active_Pct + "\r\n";
+                    var h = hArr[x]; globalHostCsv += safeCluster + "," + safeRange + "," + clusterContext + "," + csvField(h.HostName) + "," + csvField(h.Tiering) + "," + h.CPU_Pct + "," + h.Physical_RAM + "," + h.Consumed_GB + "," + h.Active_GB + "," + h.Active_Pct + "," + csvField(h.TieringSupport || "Unknown") + "\r\n";
                 }
                 var vArr = dataObj.vms || [];
                 for (var y = 0; y < vArr.length; y++) {
@@ -2724,7 +2737,7 @@ $htmlContent = @'
             if (tiering === "Enabled") anyTiered = true;
 
             hosts.push({
-                Cluster: r.Cluster || "", HostName: r.HostName || "", Tiering: tiering, TierRatioPct: 100,
+                Cluster: r.Cluster || "", HostName: r.HostName || "", Tiering: tiering, TieringSupport: r.TieringSupport || "Unknown", TierRatioPct: 100,
                 CPU_Pct: cpuPct, Physical_RAM: physRam, Consumed_GB: consumed, Active_GB: active, Active_Pct: activePct
             });
 
@@ -3039,7 +3052,7 @@ $htmlContent = @'
                 if (isNaN(activePct)) activePct = physRam > 0 ? Math.round((active / physRam) * 1000) / 10 : 0;
 
                 g.hosts.push({
-                    Cluster: ctx.clusterName, HostName: r.HostName || "", Tiering: r.Tiering || "Unknown", TierRatioPct: 100,
+                    Cluster: ctx.clusterName, HostName: r.HostName || "", Tiering: r.Tiering || "Unknown", TieringSupport: r.TieringSupport || "Unknown", TierRatioPct: 100,
                     CPU_Pct: cpuPct, Physical_RAM: physRam, Consumed_GB: consumed, Active_GB: active, Active_Pct: activePct
                 });
                 g.dramSum += physRam; g.consumedSum += consumed; g.activeSum += active; g.cpuSum += cpuPct; g.hostCount++;
@@ -3649,15 +3662,14 @@ while ($listener.IsListening) {
                     # without this flag that real 0 was indistinguishable from "esxcli didn't say" and
                     # got silently overwritten by the Mem.TierNVMePct/100 fallback below.
                     $hostTierRatioReported = $false
+                    $hostTieringSupport = Get-TieringSupportLevel $h.Version
                     if ($esxcliBudgetExceeded) {
                         $hostIsTiered = "Unknown (not queried)"
                         Write-DebugLog "[analyze] Skipping esxcli tiering-status query for host '$($h.Name)' -- per-host esxcli response time looked abnormal earlier this run; Tiering will show as 'Unknown (not queried)' for this and any remaining host(s)."
                     } else {
                     # Memory Tiering exists only on ESXi 8.0 Update 3 and later: on an older host "Disabled"
                     # would wrongly suggest a feature that is available but switched off.
-                    $hostVersion = $null
-                    [void][version]::TryParse("$($h.Version)", [ref]$hostVersion)
-                    if ($null -ne $hostVersion -and $hostVersion -lt [version]"8.0.3") {
+                    if ($hostTieringSupport -eq "Not supported") {
                         $hostIsTiered = "Not supported (ESXi $($h.Version))"
                     } else {
                     try {
@@ -3821,15 +3833,15 @@ while ($listener.IsListening) {
 
                     $hostResults.Add([PSCustomObject]@{
                         Cluster      = $clusterName
-                        HostName     = $currentHostName; Tiering = $hostIsTiered; TierRatioPct = $hostTierRatioPct; CPU_Pct = [math]::Round($hostCpuPct, 1)
+                        HostName     = $currentHostName; Tiering = $hostIsTiered; TieringSupport = $hostTieringSupport; TierRatioPct = $hostTierRatioPct; CPU_Pct = [math]::Round($hostCpuPct, 1)
                         Physical_RAM = $hostDramGB; Consumed_GB = $hostConsumedMemGB; Active_GB = $hostActiveGB; Active_Pct = if($hostDramGB -gt 0){[math]::Round(($hostActiveGB/$hostDramGB)*100,1)}else{0}
                     })
-                    Write-DebugLog "[analyze] Host '$currentHostName': Tiering='$hostIsTiered' (ratio $hostTierRatioPct%), DRAM $hostDramGB GB, consumed $hostConsumedMemGB GB, active $hostActiveGB GB, $(@($hostVMs).Count) powered-on VM(s)."
+                    Write-DebugLog "[analyze] Host '$currentHostName' (ESXi $($h.Version), support: $hostTieringSupport): Tiering='$hostIsTiered' (ratio $hostTierRatioPct%), DRAM $hostDramGB GB, consumed $hostConsumedMemGB GB, active $hostActiveGB GB, $(@($hostVMs).Count) powered-on VM(s)."
                   } catch {
                     $failedHostNames.Add($h.Name)
                     Write-DebugLog "[analyze] ERROR: host '$($h.Name)' failed entirely and was excluded from cluster totals (still listed below as 'ERROR'): $(Get-FullExceptionText $_)"
                     $hostResults.Add([PSCustomObject]@{
-                        Cluster = $clusterName; HostName = $h.Name; Tiering = "ERROR"; TierRatioPct = 0; CPU_Pct = 0
+                        Cluster = $clusterName; HostName = $h.Name; Tiering = "ERROR"; TieringSupport = (Get-TieringSupportLevel $h.Version); TierRatioPct = 0; CPU_Pct = 0
                         Physical_RAM = 0; Consumed_GB = 0; Active_GB = 0; Active_Pct = 0
                     })
                   }
@@ -3859,6 +3871,7 @@ while ($listener.IsListening) {
                     activeAvg = [math]::Round($totalActiveGB_Avg, 2)
                     cpu = if ($totalCpuMhz_Sum -gt 0) { [math]::Round(($totalCpuUsageMhz_Sum / $totalCpuMhz_Sum) * 100, 1) } else { 0 }
                     hosts = $hostResults; vms = @($vmResults | Sort-Object Active_Pct -Descending)
+                    vcenterVersion = "$($viServerObj.Version)"; vcenterTieringSupport = (Get-TieringSupportLevel $viServerObj.Version)
                     failedHosts = @($failedHostNames); failedVms = @($failedVmNames)
                 }
             } catch {

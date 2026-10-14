@@ -1,0 +1,46 @@
+{
+  "name": "lab-802",
+  "description": "Mirrors what was verified on vc-lab-01 (2026-10-14): one ESXi 8.0.2 host (96 GB) in one cluster, 2 powered-on VMs, almost idle. Real-Time figures only.",
+  "vcenters": [
+    {
+      "name": "vc-twin-lab",
+      "version": "8.0.2",
+      "statsIntervals": [
+        { "key": 1, "name": "Past day", "samplingPeriod": 300, "level": 2, "enabled": true },
+        { "key": 2, "name": "Past week", "samplingPeriod": 1800, "level": 1, "enabled": true },
+        { "key": 3, "name": "Past month", "samplingPeriod": 7200, "level": 1, "enabled": true },
+        { "key": 4, "name": "Past year", "samplingPeriod": 86400, "level": 1, "enabled": true }
+      ],
+      "clusters": [
+        {
+          "name": "cl-twin-lab",
+          "hosts": [
+            {
+              "name": "esxi-twin-lab-01", "version": "8.0.2", "build": "22380479",
+              "cpu": { "mhz": 2400, "cores": 20 }, "memoryGB": 96,
+              "realtime": { "cpuUsageMhz": 336, "memUsageMB": 6195 },
+              "tiering": { "esxcli": "kernel", "runtime": "FALSE" },
+              "stats": { "cpuPct": { "avg": 0.9, "peak": 3 }, "activePctOfDram": { "avg": 0.1, "peak": 0.2 }, "consumedPctOfDram": { "avg": 6.3, "peak": 7 } },
+              "vms": [
+                { "name": "vm-twin-lab-a", "memoryGB": 4, "vcpu": 2, "realtime": { "activeMB": 61 }, "stats": { "activePct": { "avg": 1, "peak": 2 } } },
+                { "name": "vm-twin-lab-b", "memoryGB": 8, "vcpu": 2, "realtime": { "activeMB": 41 }, "stats": { "activePct": { "avg": 0.5, "peak": 1 } } },
+                { "name": "vm-twin-lab-off", "memoryGB": 8, "vcpu": 2, "powerState": "poweredOff" }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "expect": {
+    "connect": { "clusters": ["vc-twin-lab|cl-twin-lab"] },
+    "ranges": { "vc-twin-lab|cl-twin-lab": ["Real-Time Snapshot", "Past 24 Hours"] },
+    "analyze": [
+      {
+        "cluster": "vc-twin-lab|cl-twin-lab", "range": "Real-Time Snapshot",
+        "dram": 96, "active": 0.1, "vmCount": 2, "failedVms": 0,
+        "hosts": { "esxi-twin-lab-01": { "Tiering": "Not supported (ESXi 8.0.2)", "TieringSupport": "Not supported" } }
+      }
+    ]
+  }
+}

@@ -3,6 +3,46 @@
 Sessione cloud (claude.ai/code) di coordinamento. Etichetta `sessione:cloud-coordinamento`.
 Regole in `CLAUDE.md`. Voce più recente in alto.
 
+## 2026-10-14 20:45: gemello digitale (#47) e livelli di supporto per versione (#37)
+- **Obiettivo**: Daniele: il lab non è un collo di bottiglia, si valida MTAT su un gemello digitale;
+  procedere con #37 dopo la conferma della GA 9.0 (confermata da `locale-windows`: RN VCF 9.0).
+- **Fatto**: `twin/` (modulo PowerCLI simulato guidato da scenari JSON: lab-802, mixed-90,
+  no-clusters), `docker-compose.twin.yml`, `tests/twin-e2e.js`, job CI `twin-e2e`. #37:
+  `Get-TieringSupportLevel` (< 8.0.3 Not supported, 8.0.3 Tech preview, ≥ 9.0 Supported), campo
+  `TieringSupport` (tabella "Support", CSV, import, log), `vcenterTieringSupport`.
+- **Verifiche**: gemello in container: 3 scenari ALL OK (incl. storici 7 giorni e VM non risolvibile),
+  0 CRITICAL; lab-802 riproduce i valori di `vc-lab-01`. UI su gemello in Chromium: colonna Support
+  corretta per i 5 host, CSV con TieringSupport, 0 errori JS. `tests/sizing.test.js` ok. Il gemello ha
+  scovato un proprio bug (List[object] in Get-Stat), corretto. CI reale: in attesa.
+- **Aperto**: calibrare il gemello su registrazioni reali in sola lettura (`locale-windows`); regola
+  candidata > 60 vCPU su 9.0 (Known Issue) per #38/#41.
+
+## 2026-10-14 20:15: fattibilità, decisioni di Daniele e nuove issue (#36)
+- **Fatto**: `docs/vsphere-memory-tiering-fattibilita.md` pubblicata da `locale-windows` (07cd020).
+  Decisioni di Daniele: versioni su tre livelli con GA = 9.0 (commento #37, nota in fattibilità §2);
+  host di lab 9.x da pianificare (#44, esxi-admin); base dati Greenfield dalla BCG con solo righe
+  verificate (#45); scheda hardware Brownfield con dati reali solo in locale (#46, locale-windows).
+  Commenti su #40 (controlli Brownfield mancanti) e #13 (scadenza PowerShell 7.4, nov 2026).
+  `mtat-regole-memory-tiering.md` v0.3 con le fonti di #42 (KB 448305, blog VCF) e il conflitto "All locked".
+- **Aperto**: release notes VCF 9.0 (#42); lab 9.x (#44); verifiche #32/#35 sul PC.
+
+## 2026-10-14 19:55: requisiti Memory Tiering (#36)
+- **Fatto**: sub-issue #37–#42 di #36 (scelte di Daniele: 8.0 U3 = tech preview, regole raggruppate
+  per azione). La specifica dei requisiti `docs/vsphere-memory-tiering-requisiti.md` (scritta da
+  un'altra sessione locale dal PDF 9.1, pushata da `locale-windows` in 92eb082) resta invariata.
+  Aggiunta `docs/mtat-regole-memory-tiering.md`: per ogni requisito la regola MTAT (AUTO / CALC /
+  CHECK / NOTE), soglia, esito e issue; profili VM DRAM-only dalla §7.1. Riferimenti in `CLAUDE.md`.
+- **Aperto**: versione GA (#42), rilevamento in sola lettura per M-HW/M-VM, fonte passthrough/vGPU.
+
+## 2026-10-14 19:40: merge della PR #27 su main
+- **Fatto**: su richiesta di Daniele, descrizione della PR aggiornata (#29, #30, #32, #35) e merge
+  (merge commit 8d4a126, head 1034dbb, CI verde). Chiudono al merge: #9, #21, #23, #25, #30, #32, #35.
+  Branch di integrazione riallineato a `main` per il lavoro successivo; sottoscrizione alla PR e
+  check-in rimossi.
+- **Aperto**: verifica sul PC di #32/#35 (build 1034dbb in corso). Pagina Broadcom "Memory Tiering
+  considerations and best practices" (vSphere 9.1) per #36: non raggiungibile dalla rete della
+  sessione cloud (403 dal proxy) → lettura affidata a `locale-windows`.
+
 ## 2026-10-14 19:45: #35 Sizing Rationale Greenfield
 - **Obiettivo**: con 1 host di carico + 1 nodo HA il testo diceva "2 hosts because your current CPU
   workload would overload fewer servers" a CPU 0,9% (segnalato da `locale-windows`, #35).

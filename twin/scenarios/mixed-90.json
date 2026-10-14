@@ -1,0 +1,97 @@
+{
+  "name": "mixed-90",
+  "description": "One vCenter 9.0 with a mixed cluster: ESXi 8.0.3 with tiering on (tech preview), 9.0 with tiering on via the legacy kernel setting and Mem.TierNVMePct=50, 9.0 with memtier disabled, 9.0 whose esxcli fails, an 8.0.2 host, DRAM-only VMs, an unresolvable VM, and historical stats at level 2.",
+  "vcenters": [
+    {
+      "name": "vc-twin-90",
+      "version": "9.0.0",
+      "statsIntervals": [
+        { "key": 1, "name": "Past day", "samplingPeriod": 300, "level": 2, "enabled": true },
+        { "key": 2, "name": "Past week", "samplingPeriod": 1800, "level": 2, "enabled": true },
+        { "key": 3, "name": "Past month", "samplingPeriod": 7200, "level": 1, "enabled": true },
+        { "key": 4, "name": "Past year", "samplingPeriod": 86400, "level": 1, "enabled": false }
+      ],
+      "clusters": [
+        {
+          "name": "cl-twin-mixed",
+          "hosts": [
+            {
+              "name": "esxi-twin-803", "version": "8.0.3", "build": "24022510",
+              "cpu": { "mhz": 2600, "cores": 32 }, "memoryGB": 512,
+              "realtime": { "cpuUsageMhz": 20800, "memUsageMB": 314573 },
+              "tiering": { "esxcli": "memtier", "status": "Enabled", "ratio": 100 },
+              "stats": { "cpuPct": { "avg": 25, "peak": 60 }, "activePctOfDram": { "avg": 15, "peak": 30 }, "consumedPctOfDram": { "avg": 60, "peak": 80 } },
+              "vms": [
+                { "name": "vm-twin-app-1", "memoryGB": 128, "vcpu": 16, "realtime": { "activeMB": 26214 }, "stats": { "activePct": { "avg": 15, "peak": 25 } } },
+                { "name": "vm-twin-pinned", "memoryGB": 64, "vcpu": 8, "pinned": true, "realtime": { "activeMB": 32768 }, "stats": { "activePct": { "avg": 50, "peak": 60 } } }
+              ]
+            },
+            {
+              "name": "esxi-twin-90-legacy", "version": "9.0.0", "build": "24755229",
+              "cpu": { "mhz": 2600, "cores": 32 }, "memoryGB": 512,
+              "realtime": { "cpuUsageMhz": 16640, "memUsageMB": 262144 },
+              "tiering": { "esxcli": "kernel", "runtime": "TRUE" },
+              "advancedOptions": { "Mem.TierNVMePct": 50 },
+              "stats": { "cpuPct": { "avg": 20, "peak": 50 }, "activePctOfDram": { "avg": 10, "peak": 20 }, "consumedPctOfDram": { "avg": 50, "peak": 70 } },
+              "vms": [
+                { "name": "vm-twin-notier", "memoryGB": 32, "vcpu": 4, "extraConfig": { "sched.mem.enableTiering": "FALSE" }, "realtime": { "activeMB": 3277 }, "stats": { "activePct": { "avg": 10, "peak": 20 } } },
+                { "name": "vm-twin-lowlat", "memoryGB": 16, "vcpu": 4, "latencySensitivity": "high", "realtime": { "activeMB": 1638 }, "stats": { "activePct": { "avg": 10, "peak": 15 } } }
+              ]
+            },
+            {
+              "name": "esxi-twin-90-off", "version": "9.0.0", "build": "24755229",
+              "cpu": { "mhz": 2600, "cores": 32 }, "memoryGB": 512,
+              "realtime": { "cpuUsageMhz": 8320, "memUsageMB": 157286 },
+              "tiering": { "esxcli": "memtier", "status": "Disabled" },
+              "stats": { "cpuPct": { "avg": 10, "peak": 30 }, "activePctOfDram": { "avg": 5, "peak": 12 }, "consumedPctOfDram": { "avg": 30, "peak": 40 } },
+              "vms": [
+                { "name": "vm-twin-broken", "memoryGB": 8, "vcpu": 2, "unresolvable": true }
+              ]
+            },
+            {
+              "name": "esxi-twin-90-err", "version": "9.0.0", "build": "24755229",
+              "cpu": { "mhz": 2600, "cores": 32 }, "memoryGB": 512,
+              "realtime": { "cpuUsageMhz": 5200, "memUsageMB": 104858 },
+              "tiering": { "esxcli": "error", "error": "Permission to perform this operation was denied. Required privilege 'Host.Config.AdvancedConfig' on managed object." },
+              "stats": { "cpuPct": { "avg": 5, "peak": 15 }, "activePctOfDram": { "avg": 4, "peak": 8 }, "consumedPctOfDram": { "avg": 20, "peak": 25 } },
+              "vms": []
+            },
+            {
+              "name": "esxi-twin-802", "version": "8.0.2", "build": "22380479",
+              "cpu": { "mhz": 2600, "cores": 32 }, "memoryGB": 512,
+              "realtime": { "cpuUsageMhz": 4160, "memUsageMB": 52429 },
+              "tiering": { "esxcli": "kernel", "runtime": "FALSE" },
+              "stats": { "cpuPct": { "avg": 4, "peak": 10 }, "activePctOfDram": { "avg": 2, "peak": 5 }, "consumedPctOfDram": { "avg": 10, "peak": 12 } },
+              "vms": []
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "expect": {
+    "connect": { "clusters": ["vc-twin-90|cl-twin-mixed"] },
+    "ranges": { "vc-twin-90|cl-twin-mixed": ["Real-Time Snapshot", "Past 24 Hours", "Past 7 Days"] },
+    "analyze": [
+      {
+        "cluster": "vc-twin-90|cl-twin-mixed", "range": "Real-Time Snapshot",
+        "dram": 2560, "vmCount": 4, "failedVms": 1,
+        "hosts": {
+          "esxi-twin-803":       { "Tiering": "Enabled", "TierRatioPct": 100, "TieringSupport": "Tech preview" },
+          "esxi-twin-90-legacy": { "Tiering": "Enabled", "TierRatioPct": 50,  "TieringSupport": "Supported" },
+          "esxi-twin-90-off":    { "Tiering": "Disabled", "TieringSupport": "Supported" },
+          "esxi-twin-90-err":    { "Tiering": "Unknown (query failed)", "TieringSupport": "Supported" },
+          "esxi-twin-802":       { "Tiering": "Not supported (ESXi 8.0.2)", "TieringSupport": "Not supported" }
+        }
+      },
+      {
+        "cluster": "vc-twin-90|cl-twin-mixed", "range": "Past 7 Days",
+        "dram": 2560, "vmCount": 4, "failedVms": 1,
+        "hostsNumeric": {
+          "esxi-twin-803":       { "CPU_Pct": 25, "Active_GB": 153.6, "Consumed_GB": 307.2 },
+          "esxi-twin-90-legacy": { "CPU_Pct": 20, "Active_GB": 102.4, "Consumed_GB": 256 }
+        }
+      }
+    ]
+  }
+}

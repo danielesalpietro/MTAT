@@ -1,0 +1,19 @@
+# MTAT against the DIGITAL TWIN (#47) instead of a real vCenter -- no lab, no credentials, no PowerCLI.
+#   MTAT_TWIN=mixed-90 docker compose -p mtat-twin -f docker-compose.yml -f docker-compose.twin.yml up -d --build
+#   then browse to http://localhost:8601 and connect to the vCenter names in twin/scenarios/<MTAT_TWIN>.json
+# A separate project name (-p) keeps it from replacing a real MTAT container.
+services:
+  mtat:
+    build:
+      args:
+        SKIP_POWERCLI: "1"
+    image: mtat:3.1-twin
+    container_name: mtat-twin
+    environment:
+      MTAT_TWIN_SCENARIO: /opt/mtat-twin/scenarios/${MTAT_TWIN:-mixed-90}.json
+      # The twin module is found before any other VMware.VimAutomation.Core (none is installed).
+      PSModulePath: /opt/mtat-twin/modules
+    volumes:
+      - ./twin:/opt/mtat-twin:ro
+    ports: !override
+      - "127.0.0.1:${MTAT_TWIN_HOST_PORT:-8601}:8600"
