@@ -1,0 +1,11 @@
+{
+  "name": "no-clusters",
+  "description": "Login succeeds but the vCenter has no cluster objects (standalone hosts only); a second vCenter rejects the login.",
+  "vcenters": [
+    { "name": "vc-twin-empty", "version": "9.0.0", "statsIntervals": [], "clusters": [] },
+    { "name": "vc-twin-denied", "version": "9.0.0", "login": { "error": "Cannot complete login due to an incorrect user name or password." }, "clusters": [] }
+  ],
+  "expect": {
+    "connect": { "clusters": [], "failedTargets": ["vc-twin-denied"] }
+  }
+}

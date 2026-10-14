@@ -11,6 +11,7 @@ sessione Claude (cloud o locale) che lavora sul repository.
 | `MTAT_v3_1.ps1` | motore + UI (PowerShell, HTML/JS incorporati), file unico distribuibile |
 | `MTAT_v3_1.exe` | build ps2exe upstream (non rigenerata da noi, vedi #3) |
 | `docker/`, `docker-compose.yml` | deploy container headless (`docker/README.md`) |
+| `twin/`, `docker-compose.twin.yml` | gemello digitale di vCenter/ESXi per test end-to-end senza lab (`twin/README.md`, #47) |
 | `.github/workflows/` | CI (build immagine reale + smoke test) |
 | `docs/ROADMAP.md` | fasi di evoluzione della piattaforma |
 | `docs/vsphere-memory-tiering-requisiti.md` | requisiti del Memory Tiering (vSphere 9.1), con ID `SW-`/`NV-`/`CP-`… |
@@ -83,6 +84,8 @@ issue dalla sessione che lo verifica. Nessun dato reale del lab nelle issue: sol
 - Modifiche a script/Docker: `docker compose build` (o build con `SKIP_POWERCLI=1` + modulo stub
   se PSGallery non è raggiungibile), avvio, `curl http://127.0.0.1:8600/api/ping` → 200.
 - Modifiche al guard HTTP: ripetere la matrice di test in #1.
+- Modifiche alla raccolta o all'analisi: aggiungere o aggiornare uno scenario del gemello (`twin/`)
+  e far passare `tests/twin-e2e.js`; la CI `twin-e2e` li esegue tutti.
 - La CI `Docker image` deve risultare verde sul commit.
 
 ## Sicurezza e permessi
