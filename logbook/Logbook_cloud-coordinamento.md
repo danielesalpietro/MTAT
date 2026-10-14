@@ -3,6 +3,19 @@
 Sessione cloud (claude.ai/code) di coordinamento. Etichetta `sessione:cloud-coordinamento`.
 Regole in `CLAUDE.md`. Voce più recente in alto.
 
+## 2026-10-14 15:45: #30 PowerCLI con versioni miste nell'immagine
+- **Obiettivo**: bug bloccante per #15 trovato da `locale-windows`: Core 13.3 con Common/Sdk 13.5 e
+  VMware.Vim 9.1 → `Get-EsxCli` non carica gli assembly, VMHost vuoto, "0 VM(s)" senza WARN.
+- **Fatto**: Dockerfile installa il meta-modulo `VMware.PowerCLI` a versione fissa (pinna tutti i
+  sottomoduli) + CEIP off per AllUsers; `docker/verify-powercli.ps1` fa fallire la build se un
+  modulo `VMware.*` ha più versioni o non corrisponde al manifest. Nel motore: VM accese non
+  attribuite a nessun host → WARN e voce "(no host)" in `failedVms`, mai più "0 VM" silenzioso.
+- **Verifiche**: parse dello script 0 errori; logica WARN provata in isolamento; verify-powercli
+  fallisce senza PowerCLI. Installazione reale del meta-modulo **non eseguibile in cloud**
+  (PSGallery bloccato): esito affidato alla CI.
+- **Aperto**: esito CI; rebuild e analisi #15 sul PC (ok di Daniele). Nota: l'host del lab è ESXi
+  8.0.2, il Memory Tiering richiede 8.0 U3.
+
 ## 2026-10-14 14:05: PR verso main del fork
 - **Fatto**: aperta danielesalpietro/MTAT#27 (`claude/focused-hamilton-m4loti` → `main`, fork di
   Daniele, non upstream). Chiude #9, #21, #23, #25 al merge; #1 resta aperta (Sec-Fetch-Site).

@@ -3794,6 +3794,17 @@ while ($listener.IsListening) {
                   }
                 }
 
+                # VMs are attributed to hosts by name ($_.VMHost.Name, per-host loop above). If PowerCLI
+                # returns incomplete objects (e.g. an inconsistent mix of PowerCLI module versions --
+                # seen live: every VMHost came back empty) none of them match, and the cluster silently
+                # reports "0 VM(s)". Surface every powered-on VM that no host claimed instead.
+                $clusterHostNames = @($hosts | ForEach-Object { $_.Name })
+                $unattributedVms = @($allVMs | Where-Object { $_.VMHost.Name -notin $clusterHostNames })
+                if ($unattributedVms.Count -gt 0) {
+                    Write-DebugLog "[analyze] WARNING: $($unattributedVms.Count) of $($allVMs.Count) powered-on VM(s) in cluster '$clusterName' could not be attributed to any host of the cluster (empty or unknown VMHost) and are missing from the results. This usually means PowerCLI returned incomplete object data -- check that all installed VMware.* modules come from the same PowerCLI release."
+                    foreach ($uvm in $unattributedVms) { $failedVmNames.Add("$($uvm.Name) (no host)") }
+                }
+
                 if ($failedHostNames.Count -gt 0 -or $failedVmNames.Count -gt 0) {
                     Write-DebugLog "[analyze] Completed with $($failedHostNames.Count) failed host(s) [$($failedHostNames -join ', ')] and $($failedVmNames.Count) failed VM(s) [$($failedVmNames -join ', ')] excluded from results."
                 } else {

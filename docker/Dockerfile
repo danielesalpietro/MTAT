@@ -4,9 +4,10 @@
 ARG PWSH_IMAGE=mcr.microsoft.com/powershell:7.4-ubuntu-22.04
 FROM ${PWSH_IMAGE}
 
-# Pinned for reproducible builds; bump deliberately. Only the core module (and its
-# dependencies) is installed -- it is all MTAT imports, and far smaller than VMware.PowerCLI.
-ARG POWERCLI_CORE_VERSION=13.3.0.24145081
+# Pinned for reproducible builds; bump deliberately. The VMware.PowerCLI meta-module is installed
+# (not just VMware.VimAutomation.Core) because its manifest pins every sub-module to an exact
+# version; installing Core alone let its dependencies float to newer, incompatible releases (#30).
+ARG POWERCLI_VERSION=13.3.0.24145081
 # Set to 1 only for offline smoke tests of the container itself (see docker/README.md).
 ARG SKIP_POWERCLI=0
 
@@ -27,13 +28,14 @@ RUN update-ca-certificates \
  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tzdata \
  && rm -rf /var/lib/apt/lists/*
 
+COPY docker/verify-powercli.ps1 /opt/mtat-build/verify-powercli.ps1
 RUN if [ "$SKIP_POWERCLI" != "1" ]; then \
       pwsh -NoLogo -NoProfile -Command " \
         \$ErrorActionPreference = 'Stop'; \
         Set-PSRepository -Name PSGallery -InstallationPolicy Trusted; \
-        Install-Module -Name VMware.VimAutomation.Core -RequiredVersion $POWERCLI_CORE_VERSION -Scope AllUsers -Force -AllowClobber; \
-        Import-Module VMware.VimAutomation.Core; \
-        Get-Module VMware.VimAutomation.Core | Format-Table Name, Version" ; \
+        Install-Module -Name VMware.PowerCLI -RequiredVersion $POWERCLI_VERSION -Scope AllUsers -Force -AllowClobber; \
+        Set-PowerCLIConfiguration -Scope AllUsers -ParticipateInCEIP \$false -Confirm:\$false | Out-Null" \
+   && pwsh -NoLogo -NoProfile -File /opt/mtat-build/verify-powercli.ps1 -ExpectedPowerCliVersion $POWERCLI_VERSION ; \
     fi
 
 RUN useradd --create-home --uid 10001 mtat \
