@@ -24,8 +24,10 @@ try {
 #                     are always allowed. Any other Host header is rejected -- see the request guard.
 $global:Headless = ($env:MTAT_HEADLESS -in @('1', 'true', 'yes'))
 $bindHost = if ($env:MTAT_BIND_HOST) { $env:MTAT_BIND_HOST } else { "127.0.0.1" }
+# Entries are normalized to a bare hostname, so "mtat.lab.local:8600" works the same as "mtat.lab.local".
 $global:AllowedHosts = @('localhost', '127.0.0.1', '[::1]') + @(
-    "$env:MTAT_ALLOWED_HOSTS".Split(',') | ForEach-Object { $_.Trim().ToLower() } | Where-Object { $_ }
+    "$env:MTAT_ALLOWED_HOSTS".Split(',') | Where-Object { $_.Trim() } |
+        ForEach-Object { try { ([Uri]"http://$($_.Trim())/").Host.ToLower() } catch { } }
 )
 
 function Write-Terminal($Message, $Color="White") {
@@ -3219,18 +3221,21 @@ while ($listener.IsListening) {
         # become same-origin with this engine and could drive the vCenter sessions it holds. So the
         # Host header is checked explicitly against an allowlist. Separately, any browser page could
         # fire a cross-site POST at the API (CSRF), so state-changing POSTs must come either from the
-        # engine's own UI (Origin matching an allowed host) or from a non-browser client (no Origin).
+        # engine's own UI or from a non-browser client (no Origin). "Own UI" means truly same-origin:
+        # Origin host AND port must equal the request's Host -- comparing hostnames alone would let any
+        # other web app on localhost (a dev server on :3000, another container) through.
+        $hostAuthority = try { ([Uri]"http://$($req.Headers['Host'])/").Authority.ToLower() } catch { "" }
         $hostHeaderName = try { ([Uri]"http://$($req.Headers['Host'])/").Host.ToLower() } catch { "" }
         $originHeader = $req.Headers['Origin']
-        $originHostName = $null
+        $originAuthority = $null
         if ($originHeader) {
-            $originHostName = try { ([Uri]$originHeader).Host.ToLower() } catch { "" }
+            $originAuthority = try { ([Uri]$originHeader).Authority.ToLower() } catch { "" }
         }
         $guardReason = $null
         if ($hostHeaderName -notin $global:AllowedHosts) {
             $guardReason = "Host header '$($req.Headers['Host'])' is not allowed (set MTAT_ALLOWED_HOSTS to add it)"
         }
-        elseif ($req.HttpMethod -ne "GET" -and $originHeader -and $originHostName -notin $global:AllowedHosts) {
+        elseif ($req.HttpMethod -ne "GET" -and $originHeader -and ((-not $originAuthority) -or $originAuthority -ne $hostAuthority)) {
             $guardReason = "cross-origin $($req.HttpMethod) from Origin '$originHeader' rejected"
         }
         if ($guardReason) {
