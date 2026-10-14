@@ -3,6 +3,15 @@
 Sessione cloud (claude.ai/code) di coordinamento. Etichetta `sessione:cloud-coordinamento`.
 Regole in `CLAUDE.md`. Voce più recente in alto.
 
+## 2026-10-14 20:15: fattibilità, decisioni di Daniele e nuove issue (#36)
+- **Fatto**: `docs/vsphere-memory-tiering-fattibilita.md` pubblicata da `locale-windows` (07cd020).
+  Decisioni di Daniele: versioni su tre livelli con GA = 9.0 (commento #37, nota in fattibilità §2);
+  host di lab 9.x da pianificare (#44, esxi-admin); base dati Greenfield dalla BCG con solo righe
+  verificate (#45); scheda hardware Brownfield con dati reali solo in locale (#46, locale-windows).
+  Commenti su #40 (controlli Brownfield mancanti) e #13 (scadenza PowerShell 7.4, nov 2026).
+  `mtat-regole-memory-tiering.md` v0.3 con le fonti di #42 (KB 448305, blog VCF) e il conflitto "All locked".
+- **Aperto**: release notes VCF 9.0 (#42); lab 9.x (#44); verifiche #32/#35 sul PC.
+
 ## 2026-10-14 19:55: requisiti Memory Tiering (#36)
 - **Fatto**: sub-issue #37–#42 di #36 (scelte di Daniele: 8.0 U3 = tech preview, regole raggruppate
   per azione). La specifica dei requisiti `docs/vsphere-memory-tiering-requisiti.md` (scritta da

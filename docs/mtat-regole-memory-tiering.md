@@ -1,6 +1,6 @@
 # MTAT: come applica i requisiti del Memory Tiering
 
-**Stato**: bozza v0.2 (2026-10-14). Epic #36, sub-issue #37–#42.
+**Stato**: bozza v0.3 (2026-10-14). Epic #36, sub-issue #37–#42.
 **Requisiti di riferimento**: [`vsphere-memory-tiering-requisiti.md`](vsphere-memory-tiering-requisiti.md);
 analisi di fattibilità e ordine di lavoro: [`vsphere-memory-tiering-fattibilita.md`](vsphere-memory-tiering-fattibilita.md)
 (specifica dei requisiti vSphere 9.1, ID `SW-`, `NV-`, `HW-`, `FN-`, `CP-`, `MN-`, `SM-`, `DR-`, …).
@@ -33,16 +33,16 @@ fallita, mai assimilato a PASS o FAIL).
 **Decisione di Daniele (2026-10-14)**: la specifica indica 9.1+, ma per gli assessment MTAT usa tre
 livelli. Fonti raccolte in #42: 8.0 U3 = tech preview (release notes 8.0.3, KB 95944); produzione da
 9.0 secondo fonti secondarie (release notes VCF 9.0 da leggere); la doc 9.1 indica 9.1+.
-*In discussione*: `vsphere-memory-tiering-fattibilita.md` §2 propone la soglia unica 9.1.
+**GA = 9.0** (seconda decisione di Daniele, 2026-10-14), da confermare con le release notes VCF 9.0
+prima di implementare. La proposta "soglia unica 9.1" della fattibilità §2 è superata.
 
 | Versione | Stato mostrato | Esito |
 |---|---|---|
 | < 8.0 U3 | `Not supported (ESXi x.y.z)` | FAIL |
-| ≥ 8.0 U3 e < prima release GA | `Tech preview (not for production)` | WARN |
-| ≥ GA | `Supported` | PASS |
+| 8.0 U3 (8.0.3) | `Tech preview (not for production)` | WARN |
+| ≥ 9.0 (GA) | `Supported` | PASS |
 
-*Aperto*: la versione GA esatta va presa dalle release notes (#42). Oggi il codice implementa solo
-il livello "< 8.0 U3" (#29).
+Oggi il codice implementa solo il livello "< 8.0 U3" (#29).
 
 ### 2.2 Workload (#38)
 
@@ -124,7 +124,7 @@ sizing (§2.4). Diagnostica post-attivazione: `memstats` (vmtier-stats), secondo
 
 ## 4. Punti aperti
 
-1. Versione GA del Memory Tiering (M-VER) → #42.
+1. Conferma della GA 9.0 dalle release notes VCF 9.0 (M-VER) → #42; validazione reale su host 9.x (#44).
 2. Rilevamento in sola lettura di PMem/NVDIMM, uso degli NVMe, Quick Boot, profili VM (M-HW, M-VM).
 3. Stima della memoria kernel (M-SZ-03): valore fisso, percentuale o dato rilevato.
 4. Fonte ufficiale per passthrough/vGPU (M-VM-08/09), conflitto "All locked" (M-VM-07), HA admission
@@ -137,5 +137,6 @@ sizing (§2.4). Diagnostica post-attivazione: `memstats` (vmtier-stats), secondo
 
 | Versione | Data | Modifiche |
 |---|---|---|
+| 0.3 | 2026-10-14 | GA = 9.0 (decisione di Daniele); lab 9.x (#44), base dati BCG (#45), scheda Brownfield (#46) |
 | 0.2 | 2026-10-14 | Profili VM con le fonti di #42 (KB 448305, blog VCF), conflitto "All locked", regola HA prudenziale, link alla fattibilità |
 | 0.1 | 2026-10-14 | Prima stesura: mappatura dei requisiti della specifica 9.1 e delle pagine web A/B/C (#36) sulle regole MTAT; decisione sulle versioni di Daniele |

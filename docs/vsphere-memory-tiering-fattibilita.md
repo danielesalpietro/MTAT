@@ -28,6 +28,10 @@
 
 ## 2. Correzione necessaria: versione minima
 
+> **Decisione di Daniele (2026-10-14), successiva a questa analisi:** MTAT usa tre livelli,
+> < 8.0 U3 *Not supported*, 8.0 U3 *Tech preview*, ≥ 9.0 *Supported* (GA da confermare con le
+> release notes di VCF 9.0). La proposta "soglia unica 9.1" qui sotto è superata. Dettagli in #37.
+
 Il PDF (requisiti in §2 della spec) dice **vCenter 9.1+ ed ESX 9.1+**. Il codice e le issue dicono altro:
 
 | Fonte | Versione minima indicata |
