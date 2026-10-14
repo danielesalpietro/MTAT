@@ -1,6 +1,6 @@
 # Logbook: locale-windows
 
-Sessione locale sul PC Windows di Daniele (Claude Desktop, titolo "MTAT Supervisor").
+Sessione locale sul PC Windows di Daniele (Claude Desktop, titolo "MTAT Locale - Developer").
 Etichetta `sessione:locale-windows`. Regole in `CLAUDE.md`. Voce più recente in alto.
 Orari in ora locale (CEST, UTC+2).
 
