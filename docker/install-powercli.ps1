@@ -26,8 +26,14 @@ $chosen = @{}
 $queue = New-Object System.Collections.Generic.Queue[object]
 $queue.Enqueue(@{ Name = 'VMware.PowerCLI'; Version = $PowerCliVersion; Exact = $true; By = '(build arg)' })
 
+# A requirement with no version at all (seen live: VMware.VimAutomation.StorageUtility requires
+# 'VMware.VimAutomation.Core' as a bare name) is satisfied by whatever version the tree pins
+# elsewhere; it is only checked once the walk is done, and fails the build if nothing pinned it.
+$unversioned = New-Object System.Collections.Generic.List[object]
+
 while ($queue.Count -gt 0) {
     $item = $queue.Dequeue()
+    if (-not $item.Version) { $unversioned.Add($item); continue }
     if ($chosen.ContainsKey($item.Name)) {
         $have = [version]$chosen[$item.Name]
         $want = [version]$item.Version
@@ -45,11 +51,16 @@ while ($queue.Count -gt 0) {
     $manifest = Import-PowerShellDataFile -Path $module.Path
     foreach ($req in @($manifest.RequiredModules)) {
         if ($null -eq $req) { continue }
-        if ($req -is [string]) { throw "$($item.Name) requires '$req' without a version -- cannot pin it" }
+        $by = "$($item.Name) $($item.Version)"
+        if ($req -is [string]) { $queue.Enqueue(@{ Name = $req; Version = $null; Exact = $false; By = $by }); continue }
         $exact = [bool]$req.RequiredVersion
         $version = if ($exact) { $req.RequiredVersion } else { $req.ModuleVersion }
-        if (-not $version) { throw "$($item.Name) requires '$($req.ModuleName)' without a version -- cannot pin it" }
-        $queue.Enqueue(@{ Name = $req.ModuleName; Version = "$version"; Exact = $exact; By = "$($item.Name) $($item.Version)" })
+        $queue.Enqueue(@{ Name = $req.ModuleName; Version = $(if ($version) { "$version" } else { $null }); Exact = $exact; By = $by })
+    }
+}
+foreach ($item in $unversioned) {
+    if (-not $chosen.ContainsKey($item.Name)) {
+        throw "$($item.By) requires '$($item.Name)' without a version and nothing else in the tree pins it"
     }
 }
 Write-Host "Installed $($chosen.Count) module(s) for VMware.PowerCLI $PowerCliVersion without gallery dependency resolution."
