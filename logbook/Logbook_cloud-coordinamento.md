@@ -3,6 +3,17 @@
 Sessione cloud (claude.ai/code) di coordinamento. Etichetta `sessione:cloud-coordinamento`.
 Regole in `CLAUDE.md`. Voce più recente in alto.
 
+## 2026-10-15 01:20: README EN/IT (#54) e merge della PR #55
+- **Fatto**:
+  - riscritto `README.md` in inglese e aggiunto `README_IT.md` (gemello digitale per test e demo,
+    quattro tab, regole del Memory Tiering, requisiti in sola lettura); in `CLAUDE.md` la regola di
+    aggiornare insieme i due file;
+  - merge di #55 (ea31206, CI verde) su richiesta di Daniele: su `main` ci sono ora la tab
+    Brownfield (#52), i README e la sessione `requisiti-mt`. #54 chiusa dal merge.
+- **Aperto**:
+  - default della memoria di sistema ESXi (#39);
+  - nome dello scenario di rightsizing (#50).
+
 ## 2026-10-15 00:40: merge della PR #52 (tab Brownfield)
 - **Fatto**: su richiesta di Daniele, merge di #52 (6299129) della sessione `requisiti-mt`. La PR
   aveva come base il branch di integrazione `claude/focused-hamilton-m4loti`, non `main`: la tab
