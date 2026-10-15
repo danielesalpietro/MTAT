@@ -9,6 +9,7 @@ sessione Claude (cloud o locale) che lavora sul repository.
 | Percorso | Contenuto |
 |---|---|
 | `MTAT_v3_1.ps1` | motore + UI (PowerShell, HTML/JS incorporati), file unico distribuibile |
+| `README.md`, `README_IT.md` | presentazione del progetto in inglese e in italiano: da aggiornare insieme quando cambiano funzioni, comandi o requisiti |
 | `MTAT_v3_1.exe` | build ps2exe upstream (non rigenerata da noi, vedi #3) |
 | `docker/`, `docker-compose.yml` | deploy container headless (`docker/README.md`) |
 | `twin/`, `docker-compose.twin.yml` | gemello digitale di vCenter/ESXi per test end-to-end senza lab (`twin/README.md`, #47) |
@@ -28,6 +29,7 @@ Ogni sessione ha un nome stabile, un'etichetta GitHub `sessione:<nome>` e un log
 |---|---|---|---|
 | **MTAT Supervisor** (coordinamento) | `sessione:cloud-coordinamento` | cloud (claude.ai/code) | codice, CI, issue, roadmap, coordinamento delle altre sessioni |
 | **MTAT Locale - Developer** (validazione locale) | `sessione:locale-windows` | PC Windows di Daniele (remote-control) | prove con accesso a vCenter/ESXi, Docker Desktop, verifiche sul campo, `assets.local.md` |
+| **Requisiti Memory Tiering vSphere** | `sessione:requisiti-mt` | cloud (claude.ai/code), branch proprio (es. `claude/brownfield-checklist-tab`) | analisi dei requisiti del Memory Tiering e relativa documentazione (`docs/vsphere-memory-tiering-requisiti.md`), checklist di idoneità Brownfield (#52) |
 | ESXi Admin *(esterna)* | `sessione:esxi-admin` | altro progetto, fuori dal coordinamento | gestione del laboratorio vSphere: accensione/configurazione di vCenter ed ESXi, Memory Tiering sugli host |
 
 Una nuova sessione si aggiunge qui (titolo, etichetta, ruolo) prima di ricevere lavoro. Il titolo

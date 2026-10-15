@@ -3,6 +3,30 @@
 Sessione cloud (claude.ai/code) di coordinamento. Etichetta `sessione:cloud-coordinamento`.
 Regole in `CLAUDE.md`. Voce più recente in alto.
 
+## 2026-10-15 00:40: merge della PR #52 (tab Brownfield)
+- **Fatto**: su richiesta di Daniele, merge di #52 (6299129) della sessione `requisiti-mt`. La PR
+  aveva come base il branch di integrazione `claude/focused-hamilton-m4loti`, non `main`: la tab
+  arriverà su `main` con la prossima PR del branch di integrazione.
+- **Verifiche**: prima del merge, il risultato di `main` + #52 è stato provato in locale, perché la
+  CI di #52 era precedente a #53:
+  - `node tests/sizing.test.js` → ALL OK;
+  - build con `Dockerfile.noapt` e `twin-e2e` su `mixed-90` → ALL OK;
+  - simulatore via Playwright → nessun errore JS.
+
+  La nuova tab non è stata provata in dettaglio.
+
+## 2026-10-15 00:25: merge PR #53 e registrazione della sessione requisiti
+- **Fatto**:
+  - merge di #53 (dcb2981, CI verde) su richiesta di Daniele; branch riallineato a `main`;
+    sottoscrizione e check-in rimossi;
+  - registrata in `CLAUDE.md` la sessione "Requisiti Memory Tiering vSphere"
+    (`sessione:requisiti-mt`), autrice della documentazione dei requisiti e della PR #52 (tab
+    Brownfield).
+- **Aperto**:
+  - l'etichetta `sessione:requisiti-mt` non esiste ancora su GitHub: viene creata alla prima issue
+    assegnata;
+  - la PR #52 è basata su un `main` precedente: va aggiornata con `main` (#51/#53) prima del merge.
+
 ## 2026-10-14 23:05: merge PR #51 e regole di sizing NVMe (#39)
 - **Fatto**:
   - merge di #51 (d578f6a, CI verde) su richiesta di Daniele; branch riallineato a `main`;
